@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="icons8-канцтовары-50.png" />
+    <None Remove="View\icons8-децентрализованная-сеть-50.png" />
+    <None Remove="writing-tools_11269423.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="icons8-канцтовары-50.png" />
+    <Resource Include="View\icons8-децентрализованная-сеть-50.png" />
+    <Resource Include="writing-tools_11269423.png" />
+  </ItemGroup>
+
+</Project>
