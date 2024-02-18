@@ -45,6 +45,12 @@ namespace StationeryCompany.ViewModel
         public ICommand ShowProductsBoughtByCompanyCommand { get; private set; }
         public ICommand ShowLatestSaleInfoCommand { get; private set; }
         public ICommand ShowAverageQuantityByTypeCommand { get; private set; }
+        public ICommand ShowTopSellingManagerByUnitsCommand { get; private set; }
+        public ICommand ShowTopSellingManagerByProfitCommand { get; private set; }
+        public ICommand ShowTopCustomerCompanyBySpendingCommand { get; private set; }
+        public ICommand ShowTopProductTypeByUnitsSoldCommand { get; private set; }
+        public ICommand ShowTopProfitableProductTypeCommand { get; private set; }
+        public ICommand ShowMostPopularProductsCommand { get; private set; }
         public ViewModelStationery(string connect)
         {
             connection = connect;
@@ -67,6 +73,44 @@ namespace StationeryCompany.ViewModel
             ShowProductsBoughtByCompanyCommand = new DelegateCommand(ShowProductsBoughtByCompany, (object parameter) => true);
             ShowLatestSaleInfoCommand = new DelegateCommand(ShowLatestSaleInfo, (object parameter) => true);
             ShowAverageQuantityByTypeCommand = new DelegateCommand(ShowAverageQuantityByType, (object parameter) => true);
+            ShowTopSellingManagerByUnitsCommand = new DelegateCommand(ShowTopSellingManagerByUnits, (object parameter) => true);
+            ShowTopSellingManagerByProfitCommand = new DelegateCommand(ShowTopSellingManagerByProfit, (object parameter) => true);
+            //
+            ShowTopCustomerCompanyBySpendingCommand = new DelegateCommand(ShowTopCustomerCompanyBySpending, (object parameter) => true);
+            ShowTopProductTypeByUnitsSoldCommand = new DelegateCommand(ShowTopProductTypeByUnitsSold, (object parameter) => true);
+            ShowTopProfitableProductTypeCommand = new DelegateCommand(ShowTopProfitableProductType, (object parameter) => true);
+            ShowMostPopularProductsCommand = new DelegateCommand(ShowMostPopularProducts, (object parameter) => true);
+            //
+        }
+
+        private void ShowMostPopularProducts(object obj)
+        {
+            ExecuteStoredProcedure("ShowMostPopularProducts");
+        }
+
+        private void ShowTopProfitableProductType(object obj)
+        {
+            ExecuteStoredProcedure("ShowTopProfitableProductType");
+        }
+
+        private void ShowTopProductTypeByUnitsSold(object obj)
+        {
+            ExecuteStoredProcedure("ShowTopProductType");
+        }
+
+        private void ShowTopCustomerCompanyBySpending(object obj)
+        {
+            ExecuteStoredProcedure("ShowTopCustomer");
+        }
+
+        private void ShowTopSellingManagerByProfit(object obj)
+        {
+            ExecuteStoredProcedure("ShowTopByProfit");
+        }
+
+        private void ShowTopSellingManagerByUnits(object obj)
+        {
+            ExecuteStoredProcedure("ShowTopManager");
         }
 
         private void ShowAverageQuantityByType(object obj)
