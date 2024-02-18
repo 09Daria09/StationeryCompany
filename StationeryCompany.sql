@@ -352,7 +352,87 @@ END;
 
 EXEC ShowAverageQuantityByProductType;
 
+--Часть 2 
 
+CREATE PROCEDURE ShowTopManager AS
+BEGIN
+    SELECT TOP 1
+        SM.ManagerName as [Имя менеджера],
+        SUM(S.QuantitySold) as [Общее количество продаж]
+    FROM SalesManagers SM
+    JOIN Sales S ON SM.ManagerID = S.ManagerID
+    GROUP BY SM.ManagerName
+    ORDER BY SUM(S.QuantitySold) DESC;
+END;
 
+EXEC ShowTopManager;
 
+CREATE PROCEDURE ShowTopByProfit AS
+BEGIN
+    SELECT TOP 1
+        SM.ManagerName as [Имя менеджера],
+        SUM(S.PricePerUnit * S.QuantitySold) as [Общая прибыль]
+    FROM SalesManagers SM
+    JOIN Sales S ON SM.ManagerID = S.ManagerID
+    GROUP BY SM.ManagerName
+    ORDER BY SUM(S.PricePerUnit * S.QuantitySold) DESC;
+END;
 
+EXEC ShowTopByProfit;
+
+--3 Нужно сделать 
+
+CREATE PROCEDURE ShowTopCustomer AS
+BEGIN
+    SELECT 
+        CC.CompanyName as [Название компании],
+        SUM(S.PricePerUnit * S.QuantitySold) as [Общая сумма покупок]
+    FROM CustomerCompanies CC
+    JOIN Sales S ON CC.CompanyID = S.CompanyID
+    GROUP BY CC.CompanyName
+    ORDER BY SUM(S.PricePerUnit * S.QuantitySold) DESC;
+END;
+
+EXEC ShowTopCustomer;
+--
+
+CREATE PROCEDURE ShowTopProductType AS
+BEGIN
+    SELECT 
+        PT.TypeName as [Тип продукта],
+        SUM(S.QuantitySold) as [Общее количество продаж]
+    FROM ProductTypes PT
+    JOIN Products P ON PT.TypeID = P.TypeID
+    JOIN Sales S ON P.ProductID = S.ProductID
+    GROUP BY PT.TypeName
+    ORDER BY SUM(S.QuantitySold) DESC;
+END;
+
+EXEC ShowTopProductType;
+
+CREATE PROCEDURE ShowTopProfitableProductType AS
+BEGIN
+    SELECT 
+        PT.TypeName as [Тип продукта],
+        SUM(S.QuantitySold * S.PricePerUnit) as [Общая прибыль]
+    FROM ProductTypes PT
+    JOIN Products P ON PT.TypeID = P.TypeID
+    JOIN Sales S ON P.ProductID = S.ProductID
+    GROUP BY PT.TypeName
+    ORDER BY SUM(S.QuantitySold * S.PricePerUnit) DESC;
+END;
+
+EXEC ShowTopProfitableProductType;
+
+CREATE PROCEDURE ShowMostPopularProducts AS
+BEGIN
+    SELECT 
+        P.ProductName as [Название продукта],
+        SUM(S.QuantitySold) as [Количество проданных единиц]
+    FROM Products P
+    JOIN Sales S ON P.ProductID = S.ProductID
+    GROUP BY P.ProductName
+    ORDER BY SUM(S.QuantitySold) DESC;
+END;
+
+EXEC ShowMostPopularProducts;
