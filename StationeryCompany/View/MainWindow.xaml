@@ -49,9 +49,8 @@
                     <MenuItem Header="Канцтовары с максимальной себестоимостью" Command="{Binding ShowProductsWithMaxCostCommand}"/>
 
                     <MenuItem Header="Канцтовары по типу" Command="{Binding ShowProductsByTypeCommand}" ItemsSource="{Binding MenuItems}"/>
-
                     <MenuItem Header="Канцтовары, проданные менеджером" Command="{Binding ShowProductsSoldByManagerCommand}" ItemsSource="{Binding MenuItems1}"/>
-                    <MenuItem Header="Канцтовары, купленные фирмой" Command="{Binding ShowProductsBoughtByCompanyCommand}"/>
+                    <MenuItem Header="Канцтовары, купленные фирмой" Command="{Binding ShowProductsBoughtByCompanyCommand}" ItemsSource="{Binding MenuItems2}"/>
                     <MenuItem Header="Информация о последней продаже" Command="{Binding ShowLatestSaleInfoCommand}"/>
                     <MenuItem Header="Среднее количество товаров по типу" Command="{Binding ShowAverageQuantityByTypeCommand}"/>
                 </MenuItem>

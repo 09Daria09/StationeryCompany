@@ -31,7 +31,8 @@ namespace StationeryCompany.ViewModel
             }
         }
         public ObservableCollection<MenuItem> MenuItems { get; set; }
-        public ObservableCollection<MenuItem> MenuItems1 { get; set; } 
+        public ObservableCollection<MenuItem> MenuItems1 { get; set; }
+        public ObservableCollection<MenuItem> MenuItems2 { get; set; }
         public ICommand ShowAllProductsCommand { get; private set; }
         public ICommand ShowAllProductTypesCommand { get; private set; }
         public ICommand ShowAllSalesManagersCommand { get; private set; }
@@ -41,6 +42,9 @@ namespace StationeryCompany.ViewModel
         public ICommand ShowProductsWithMaxCostCommand { get; private set; }
         public ICommand ShowProductsByTypeCommand { get; private set; }
         public ICommand ShowProductsSoldByManagerCommand { get; private set; }
+        public ICommand ShowProductsBoughtByCompanyCommand { get; private set; }
+        public ICommand ShowLatestSaleInfoCommand { get; private set; }
+        public ICommand ShowAverageQuantityByTypeCommand { get; private set; }
         public ViewModelStationery(string connect)
         {
             connection = connect;
@@ -48,6 +52,8 @@ namespace StationeryCompany.ViewModel
             InitializeMenuItems();
             MenuItems1 = new ObservableCollection<MenuItem>();
             InitializeMenuItems1();
+            MenuItems2 = new ObservableCollection<MenuItem>();
+            InitializeMenuItems2();
 
             ShowAllProductsCommand = new DelegateCommand(ShowAllProducts, (object parameter) => true);
             ShowAllProductTypesCommand = new DelegateCommand(ShowAllProductTypes, (object parameter) => true);
@@ -57,7 +63,33 @@ namespace StationeryCompany.ViewModel
             ShowProductsWithMinCostCommand = new DelegateCommand(ShowProductsWithMinCost, (object parameter) => true);
             ShowProductsWithMaxCostCommand = new DelegateCommand(ShowProductsWithMaxCost, (object parameter) => true);
             ShowProductsByTypeCommand = new DelegateCommand(ShowProductsByType, (object parameter) => true);
-            ShowProductsSoldByManagerCommand = new DelegateCommand(ShowProductsSoldByManager, (object parameter) => true); 
+            ShowProductsSoldByManagerCommand = new DelegateCommand(ShowProductsSoldByManager, (object parameter) => true);
+            ShowProductsBoughtByCompanyCommand = new DelegateCommand(ShowProductsBoughtByCompany, (object parameter) => true);
+            ShowLatestSaleInfoCommand = new DelegateCommand(ShowLatestSaleInfo, (object parameter) => true);
+            ShowAverageQuantityByTypeCommand = new DelegateCommand(ShowAverageQuantityByType, (object parameter) => true);
+        }
+
+        private void ShowAverageQuantityByType(object obj)
+        {
+            ExecuteStoredProcedure("ShowAverageQuantityByProductType");
+        }
+
+        private void ShowLatestSaleInfo(object obj)
+        {
+            ExecuteStoredProcedure("ShowLatestSale");
+        }
+
+        private void ShowProductsBoughtByCompany(object obj)
+        {
+            var typeName = obj as string;
+            if (typeName == null) return;
+
+            var parameters = new Dictionary<string, object>
+    {
+        { "@CompanyName", typeName }
+    };
+
+            ExecuteStoredProcedure("ShowProductsBoughtByCompany", parameters);
         }
 
         private void ShowProductsSoldByManager(object obj)
@@ -156,6 +188,42 @@ namespace StationeryCompany.ViewModel
                 MenuItems1.Add(menuItem);
             }
         }
+        public async void InitializeMenuItems2()
+        {
+            var productTypes = await GetCompanyNamesAsync();
+
+            MenuItems2.Clear();
+
+            foreach (var type in productTypes)
+            {
+                var menuItem = new MenuItem
+                {
+                    Header = type,
+                    Command = ShowProductsBoughtByCompanyCommand,
+                    CommandParameter = type
+                };
+
+                MenuItems2.Add(menuItem);
+            }
+        }
+        public async Task<List<string>> GetCompanyNamesAsync()
+        {
+            var companyNames = new List<string>();
+            using (var connect = new SqlConnection(connection))
+            {
+                await connect.OpenAsync();
+                var command = new SqlCommand("SELECT DISTINCT CompanyName FROM CustomerCompanies ORDER BY CompanyName", connect);
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        companyNames.Add(reader.GetString(0));
+                    }
+                }
+            }
+            return companyNames;
+        }
+
         public async Task<List<string>> GetManagerNamesAsync()
         {
             var managerNames = new List<string>();
@@ -173,7 +241,6 @@ namespace StationeryCompany.ViewModel
             }
             return managerNames;
         }
-
         public async Task<List<string>> GetCategoriesAsync()
         {
             var productTypes = new List<string>();
