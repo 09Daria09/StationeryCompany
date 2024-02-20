@@ -1,10 +1,14 @@
 CREATE DATABASE StationeryCompany
+GO
+
 USE StationeryCompany
+GO
 
 CREATE TABLE ProductTypes (
     TypeID INT PRIMARY KEY IDENTITY,
     TypeName VARCHAR(255)
 );
+GO
 
 INSERT INTO ProductTypes (TypeName) 
 VALUES 
@@ -17,6 +21,8 @@ VALUES
     (N'Офисная мебель'),
     (N'Игры и развлечения');
 
+	GO
+
 CREATE TABLE Products (
     ProductID INT PRIMARY KEY IDENTITY,
     ProductName VARCHAR(255),
@@ -25,6 +31,8 @@ CREATE TABLE Products (
     Cost DECIMAL(10,2),
     FOREIGN KEY (TypeID) REFERENCES ProductTypes(TypeID)
 );
+GO
+
 INSERT INTO Products (ProductName, TypeID, Quantity, Cost) 
 VALUES 
     (N'Гелевая ручка', 1, 100, 20.00),
@@ -52,6 +60,7 @@ VALUES
     (N'Пенал школьный', 1, 85, 120.00),
     (N'Книга для заметок', 2, 70, 80.00),
     (N'Таблетка для рисования', 6, 20, 2000.00);
+	GO
 
 
 CREATE TABLE SalesManagers (
@@ -59,6 +68,7 @@ CREATE TABLE SalesManagers (
     ManagerName VARCHAR(255),
 	PhoneNumber VARCHAR(20)
 );
+GO
 INSERT INTO SalesManagers (ManagerName, PhoneNumber) 
 VALUES 
     (N'Иван Иванов', '+380 (98) 173-45-67'),
@@ -66,14 +76,14 @@ VALUES
     (N'Алексей Сидоров', '+380 (44) 123-45-67'),
     (N'Елена Васильева', '+380 (96) 984-22-86'),
     (N'Николай Морозов', '+380 (44) 654-90-45');
-	
-
+	GO
 CREATE TABLE CustomerCompanies (
     CompanyID INT PRIMARY KEY IDENTITY,
     CompanyName VARCHAR(255),
     PhoneNumber VARCHAR(20),
     City VARCHAR(255)
 );
+GO
 
 INSERT INTO CustomerCompanies (CompanyName, PhoneNumber, City) 
 VALUES 
@@ -89,6 +99,7 @@ VALUES
     (N'ООО "IT Solutions"', '+380-57-012-3456', 'Харьков'),
     (N'ООО "ЭлектроСвязь"', '+380-62-123-4567', 'Донецк'),
     (N'ООО "КреативСтрой"', '+380-48-234-5678', 'Одесса');
+	GO
 
 CREATE TABLE Sales (
     SaleID INT PRIMARY KEY IDENTITY,
@@ -102,6 +113,7 @@ CREATE TABLE Sales (
     FOREIGN KEY (ManagerID) REFERENCES SalesManagers(ManagerID),
     FOREIGN KEY (CompanyID) REFERENCES CustomerCompanies(CompanyID)
 );
+GO
 
 INSERT INTO Sales (ProductID, ManagerID, CompanyID, QuantitySold, PricePerUnit, SaleDate) 
 VALUES 
@@ -190,6 +202,7 @@ BEGIN
     FROM Products
     INNER JOIN ProductTypes ON Products.TypeID = ProductTypes.TypeID;
 END;
+GO
 --
 CREATE PROCEDURE ShowAllProductTypes AS
 BEGIN
@@ -198,6 +211,7 @@ BEGIN
         TypeName as [Название типа]
     FROM ProductTypes;
 END;
+GO
 --
 CREATE PROCEDURE ShowAllSalesManagers AS
 BEGIN
@@ -207,7 +221,7 @@ BEGIN
         PhoneNumber as [Телефонный номер]
     FROM SalesManagers;
 END;
-
+GO
 --
 CREATE PROCEDURE ShowProductsWithMaxQuantity AS
 BEGIN
@@ -221,7 +235,7 @@ BEGIN
     INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
     WHERE P.Quantity = (SELECT MAX(Quantity) FROM Products);
 END;
-
+GO
 --
 CREATE PROCEDURE ShowProductsWithMinQuantity AS
 BEGIN
@@ -235,7 +249,8 @@ BEGIN
 	INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
     WHERE Quantity = (SELECT MIN(Quantity) FROM Products);
 END;
-EXEC ShowProductsWithMinQuantity;
+GO
+
 --1
 CREATE PROCEDURE ShowProductsWithMinCost AS
 BEGIN
@@ -249,7 +264,7 @@ BEGIN
 	INNER JOIN ProductTypes PT ON p.TypeID = PT.TypeID
     WHERE Cost = (SELECT MIN(Cost) FROM Products);
 END;
-EXEC ShowProductsWithMinCost;
+GO
 --
 CREATE PROCEDURE ShowProductsWithMaxCost AS
 BEGIN
@@ -263,7 +278,7 @@ BEGIN
 	INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
     WHERE Cost = (SELECT MAX(Cost) FROM Products);
 END;
-EXEC ShowProductsWithMaxCost;
+GO
 --
 CREATE PROCEDURE ShowProductsByType
     @TypeName NVARCHAR(255)
@@ -279,7 +294,7 @@ BEGIN
     INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
     WHERE PT.TypeName = @TypeName;
 END;
-EXEC ShowProductsByType @TypeName = N'Канцелярия';
+GO
 
 CREATE PROCEDURE ShowProductsSoldByManager
     @ManagerName NVARCHAR(255)
@@ -296,10 +311,7 @@ BEGIN
     INNER JOIN SalesManagers SM ON S.ManagerID = SM.ManagerID
     WHERE SM.ManagerName = @ManagerName;
 END;
-EXEC ShowProductsSoldByManager @ManagerName = N'Иван Иванов';
-
-
-
+GO
 
 CREATE PROCEDURE ShowProductsBoughtByCompany
     @CompanyName NVARCHAR(255)
@@ -316,8 +328,7 @@ BEGIN
     INNER JOIN CustomerCompanies CC ON S.CompanyID = CC.CompanyID
     WHERE CC.CompanyName = @CompanyName;
 END;
-
-EXEC ShowProductsBoughtByCompany @CompanyName = N'ООО "АгроКомплект"';
+GO
 
 
 CREATE PROCEDURE ShowLatestSale
@@ -337,7 +348,7 @@ BEGIN
     ORDER BY S.SaleDate DESC;
 END;
 
-EXEC ShowLatestSale;
+GO
 
 CREATE PROCEDURE ShowAverageQuantityByProductType
 AS
@@ -349,8 +360,7 @@ BEGIN
     INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
     GROUP BY PT.TypeName;
 END;
-
-EXEC ShowAverageQuantityByProductType;
+GO
 
 --Часть 2 
 
@@ -364,8 +374,7 @@ BEGIN
     GROUP BY SM.ManagerName
     ORDER BY SUM(S.QuantitySold) DESC;
 END;
-
-EXEC ShowTopManager;
+GO
 
 CREATE PROCEDURE ShowTopByProfit AS
 BEGIN
@@ -377,10 +386,7 @@ BEGIN
     GROUP BY SM.ManagerName
     ORDER BY SUM(S.PricePerUnit * S.QuantitySold) DESC;
 END;
-
-EXEC ShowTopByProfit;
-
---3 Нужно сделать 
+GO
 
 CREATE PROCEDURE ShowTopCustomer AS
 BEGIN
@@ -393,7 +399,7 @@ BEGIN
     ORDER BY SUM(S.PricePerUnit * S.QuantitySold) DESC;
 END;
 
-EXEC ShowTopCustomer;
+GO
 --
 
 CREATE PROCEDURE ShowTopProductType AS
@@ -407,8 +413,7 @@ BEGIN
     GROUP BY PT.TypeName
     ORDER BY SUM(S.QuantitySold) DESC;
 END;
-
-EXEC ShowTopProductType;
+GO
 
 CREATE PROCEDURE ShowTopProfitableProductType AS
 BEGIN
@@ -421,8 +426,7 @@ BEGIN
     GROUP BY PT.TypeName
     ORDER BY SUM(S.QuantitySold * S.PricePerUnit) DESC;
 END;
-
-EXEC ShowTopProfitableProductType;
+GO
 
 CREATE PROCEDURE ShowMostPopularProducts AS
 BEGIN
@@ -434,5 +438,298 @@ BEGIN
     GROUP BY P.ProductName
     ORDER BY SUM(S.QuantitySold) DESC;
 END;
+GO
 
-EXEC ShowMostPopularProducts;
+CREATE PROCEDURE ShowUnsoldProducts
+    @DaysNotSold INT
+AS
+BEGIN
+    SELECT 
+        P.ProductName as [Название продукта],
+        ISNULL(DATEDIFF(DAY, MAX(S.SaleDate), GETDATE()), @DaysNotSold) AS [Дней не продано]
+    FROM Products P
+    LEFT JOIN Sales S ON S.ProductID = P.ProductID
+    GROUP BY P.ProductID, P.ProductName
+    HAVING MAX(S.SaleDate) IS NULL OR MAX(S.SaleDate) < DATEADD(DAY, -@DaysNotSold, GETDATE())
+    ORDER BY P.ProductName;
+END;
+GO
+
+
+CREATE PROCEDURE ShowTopSellingManagerByProfitInPeriod
+    @StartDate DATE,
+    @EndDate DATE
+AS
+BEGIN
+    SELECT TOP 1
+        SM.ManagerName AS [Имя менеджера],
+        SUM(S.QuantitySold * S.PricePerUnit) AS [Общая выручка]
+    FROM SalesManagers SM
+    JOIN Sales S ON SM.ManagerID = S.ManagerID
+    WHERE S.SaleDate BETWEEN @StartDate AND @EndDate
+    GROUP BY SM.ManagerName
+    ORDER BY [Общая выручка] DESC;
+END;
+GO
+
+CREATE PROCEDURE ShowAllCompaniesWithOrderCount
+AS
+BEGIN
+    SELECT 
+	    CC.CompanyID AS [ID сомпании],
+        CC.CompanyName AS [Название компании],
+        CC.PhoneNumber AS [Номер телефона],
+		CC.City AS [Город],
+        COUNT(S.SaleID) AS [Количество заказов]
+    FROM CustomerCompanies CC
+    LEFT JOIN Sales S ON CC.CompanyID = S.CompanyID
+    GROUP BY CC.CompanyID, CC.CompanyName, CC.PhoneNumber, CC.City
+    ORDER BY CC.CompanyName;
+END;
+GO
+
+CREATE PROCEDURE DeleteProduct
+   @ProductID INT
+AS
+BEGIN
+    -- Нужно для отката транзакции в случае ошибки
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        DELETE FROM Sales WHERE ProductID = @ProductID;
+        DELETE FROM Products WHERE ProductID = @ProductID;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+
+GO
+
+
+CREATE PROCEDURE DeleteProductTypeAndRelatedProducts
+    @TypeID INT
+AS
+BEGIN
+    SET XACT_ABORT ON;
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        DELETE FROM Sales
+        WHERE ProductID IN (SELECT ProductID FROM Products WHERE TypeID = @TypeID);
+
+        DELETE FROM Products WHERE TypeID = @TypeID;
+
+        DELETE FROM ProductTypes WHERE TypeID = @TypeID;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE PROCEDURE DeleteSalesManagerAndRelatedSales
+    @ManagerID INT
+AS
+BEGIN
+    SET XACT_ABORT ON;
+
+    BEGIN TRANSACTION;
+   BEGIN TRY
+        DELETE FROM Sales WHERE ManagerID = @ManagerID;
+        DELETE FROM SalesManagers WHERE ManagerID = @ManagerID;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+
+GO
+CREATE PROCEDURE DeleteSalesCompaniesAndRelatedSales
+    @CompaniesID INT
+AS
+BEGIN
+    SET XACT_ABORT ON;
+
+    BEGIN TRANSACTION;
+   BEGIN TRY
+        DELETE FROM Sales WHERE CompanyID = @CompaniesID;
+        DELETE FROM CustomerCompanies WHERE CompanyID = @CompaniesID;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+
+GO
+
+CREATE PROCEDURE GetAllSalesDetails
+AS
+BEGIN
+    SELECT
+        s.SaleID AS [ID продажи],
+        p.ProductName AS [Название продукта],
+        sm.ManagerName AS [Имя менеджера],
+        cc.CompanyName AS [Название компании],
+        s.QuantitySold AS [Количество продано],
+        s.PricePerUnit AS [Цена за единицу],
+        s.SaleDate AS [Дата продажи]
+    FROM Sales s
+    JOIN Products p ON s.ProductID = p.ProductID
+    JOIN SalesManagers sm ON s.ManagerID = sm.ManagerID
+    JOIN CustomerCompanies cc ON s.CompanyID = cc.CompanyID
+    ORDER BY s.SaleDate DESC;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE UpdateProductTypeName
+    @TypeID INT,
+    @NewTypeName VARCHAR(255)
+AS
+BEGIN
+    IF EXISTS (SELECT 1 FROM ProductTypes WHERE TypeID = @TypeID)
+    BEGIN
+        UPDATE ProductTypes
+        SET TypeName = @NewTypeName
+        WHERE TypeID = @TypeID;
+    END
+END;
+GO
+
+CREATE PROCEDURE GetProductTypeById
+    @TypeID INT
+AS
+BEGIN
+    SELECT TypeName
+    FROM ProductTypes
+    WHERE TypeID = @TypeID;
+END;
+GO
+
+CREATE PROCEDURE GetManagerById
+    @ManagerID  INT
+AS
+BEGIN
+    SELECT ManagerName, PhoneNumber 
+    FROM SalesManagers 
+    WHERE ManagerID  = @ManagerID ;
+END;
+GO
+
+CREATE PROCEDURE UpdateSalesManager
+    @ManagerID INT,
+    @ManagerName VARCHAR(255),
+    @PhoneNumber VARCHAR(20)
+AS
+BEGIN
+    UPDATE SalesManagers
+    SET ManagerName = @ManagerName, PhoneNumber = @PhoneNumber
+    WHERE ManagerID = @ManagerID;
+END;
+GO
+
+CREATE PROCEDURE UpdateCustomerCompany
+    @CompanyID INT,
+    @CompanyName VARCHAR(255),
+    @PhoneNumber VARCHAR(20),
+    @City VARCHAR(255)
+AS
+BEGIN
+    UPDATE CustomerCompanies
+    SET CompanyName = @CompanyName,
+        PhoneNumber = @PhoneNumber,
+        City = @City
+    WHERE CompanyID = @CompanyID;
+END;
+GO
+
+CREATE PROCEDURE GetCompaniesById
+    @CompanyID   INT
+AS
+BEGIN
+    SELECT CompanyName, PhoneNumber, City 
+	FROM CustomerCompanies  
+    WHERE CompanyID  = @CompanyID  ;
+END;
+GO
+
+CREATE PROCEDURE GetProductById
+    @ProductID   INT
+AS
+BEGIN
+    SELECT ProductName, TypeID, Quantity, Cost 
+	FROM Products   
+    WHERE ProductID  = @ProductID  ;
+END;
+GO
+
+CREATE PROCEDURE UpdateProduct
+    @ProductID INT,
+    @ProductName VARCHAR(255),
+    @TypeID INT,
+    @Quantity INT,
+    @Cost DECIMAL(10,2)
+AS
+BEGIN
+    UPDATE Products
+    SET ProductName = @ProductName,
+        TypeID = @TypeID,
+        Quantity = @Quantity,
+        Cost = @Cost
+    WHERE ProductID = @ProductID;
+END;
+GO
+
+CREATE PROCEDURE AddSalesManager
+    @ManagerName VARCHAR(255),
+    @PhoneNumber VARCHAR(20)
+AS
+BEGIN
+    INSERT INTO SalesManagers (ManagerName, PhoneNumber)
+    VALUES (@ManagerName, @PhoneNumber);
+END;
+GO
+
+CREATE PROCEDURE AddCustomerCompany
+    @CompanyName VARCHAR(255),
+    @PhoneNumber VARCHAR(20),
+    @City VARCHAR(255)
+AS
+BEGIN
+    INSERT INTO CustomerCompanies (CompanyName, PhoneNumber, City)
+    VALUES (@CompanyName, @PhoneNumber, @City);
+END;
+GO
+
+CREATE PROCEDURE AddProductType
+    @TypeName VARCHAR(255)
+AS
+BEGIN
+    INSERT INTO ProductTypes (TypeName)
+    VALUES (@TypeName);
+END;
+GO
+
+CREATE PROCEDURE AddProduct
+    @ProductName VARCHAR(255),
+    @TypeID INT,
+    @Quantity INT,
+    @Cost DECIMAL(10,2)
+AS
+BEGIN
+    INSERT INTO Products (ProductName, TypeID, Quantity, Cost)
+    VALUES (@ProductName, @TypeID, @Quantity, @Cost);
+END;
+GO

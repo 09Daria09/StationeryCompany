@@ -10,16 +10,19 @@
 
   <ItemGroup>
     <None Remove="icons8-канцтовары-50.png" />
+    <None Remove="View\icons8-edit-50.png" />
     <None Remove="View\icons8-децентрализованная-сеть-50.png" />
     <None Remove="writing-tools_11269423.png" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.77" />
     <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="icons8-канцтовары-50.png" />
+    <Resource Include="View\icons8-edit-50.png" />
     <Resource Include="View\icons8-децентрализованная-сеть-50.png" />
     <Resource Include="writing-tools_11269423.png" />
   </ItemGroup>

@@ -3,12 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:StationeryCompany"
+        xmlns:local="clr-namespace:StationeryCompany.Model" xmlns:behaviors="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
         Title="Учет канцтоваров" MinHeight="250" MinWidth="400"  WindowState="Maximized"
         Background="LightBlue" Icon="/icons8-канцтовары-50.png">
     <Window.Resources>
-        <Style TargetType="Menu">
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        
+                <Style TargetType="Menu">
             <Setter Property="Background" Value="#3A7BD5"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
@@ -29,6 +31,21 @@
             <Setter Property="BorderBrush" Value="#4FC3F7"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="DodgerBlue"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="DodgerBlue"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="DeepSkyBlue"/>
+                    <Setter Property="Foreground" Value="DarkBlue"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -43,6 +60,8 @@
                     <MenuItem Header="Все канцтовары" Command="{Binding ShowAllProductsCommand}"/>
                     <MenuItem Header="Типы канцтоваров" Command="{Binding ShowAllProductTypesCommand}"/>
                     <MenuItem Header="Менеджеры по продажам" Command="{Binding ShowAllSalesManagersCommand}"/>
+                    <MenuItem Header="Все фирмы" Command="{Binding ShowAllCompaniesCommand}"/>
+
                     <MenuItem Header="Канцтовары с максимальным количеством" Command="{Binding ShowProductsWithMaxQuantityCommand}"/>
                     <MenuItem Header="Канцтовары с минимальным количеством" Command="{Binding ShowProductsWithMinQuantityCommand}"/>
                     <MenuItem Header="Канцтовары с минимальной себестоимостью" Command="{Binding ShowProductsWithMinCostCommand}"/>
@@ -58,18 +77,41 @@
                 <MenuItem Header="Показ информации" FontSize="18">
                     <MenuItem Header="Менеджер с наибольшим количеством продаж по единицам" Command="{Binding ShowTopSellingManagerByUnitsCommand}"/>
                     <MenuItem Header="Менеджер с наибольшей общей суммой прибыли" Command="{Binding ShowTopSellingManagerByProfitCommand}"/>
-                    <MenuItem Header="Менеджер с наибольшей общей суммой прибыли за период !!! В разработке ^)" Command="{Binding ShowTopSellingManagerByProfitInPeriodCommand}"/>
+                    <MenuItem Header="Менеджер с наибольшей общей суммой прибыли за период" Command="{Binding ShowTopSellingManagerByProfitInPeriodCommand}"/>
                     <MenuItem Header="Фирма покупатель, купившая на самую большую сумму" Command="{Binding ShowTopCustomerCompanyBySpendingCommand}"/>
                     <MenuItem Header="Тип канцтоваров с наибольшим количеством продаж" Command="{Binding ShowTopProductTypeByUnitsSoldCommand}"/>
                     <MenuItem Header="Самый прибыльный тип канцтоваров" Command="{Binding ShowTopProfitableProductTypeCommand}"/>
                     <MenuItem Header="Самые популярные канцтовары" Command="{Binding ShowMostPopularProductsCommand}"/>
-                    <MenuItem Header="Канцтовары, не продававшиеся заданное количество дней !!! В разработке ^)" Command="{Binding ShowUnsoldProductsCommand}"/>
+                    <MenuItem Header="Канцтовары, не продававшиеся заданное количество дней" Command="{Binding ShowUnsoldProductsCommand}"/>
+                </MenuItem>
+                <MenuItem Header="Добавление" FontSize="18">
+                    <MenuItem Header="Добавить тип продукт" Command="{Binding AddProductsCommand}"/>
+                    <MenuItem Header="Добавить менеджера" Command="{Binding AddManagerCommand}"/>
+                    <MenuItem Header="Добавить компанию" Command="{Binding AddCompanyCommand}"/>
+                    <MenuItem Header="Добавить продукт" Command="{Binding AddProductCommand}"/>
                 </MenuItem>
 
             </Menu>
         </DockPanel>
 
-        <DataGrid Grid.Row="1" Name="dataGrid" Margin="10" AutoGenerateColumns="True"
-                  ItemsSource="{Binding ProductsData}" FontSize="18"/>
+        <DataGrid Grid.Row="1" Name="dataGrid" Margin="10" 
+          ItemsSource="{Binding ProductsData}" FontSize="18">
+            <DataGrid.RowDetailsTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Изменить" 
+                        Visibility="{Binding DataContext.IsShowAllProductsCommandExecuted, Converter={StaticResource BooleanToVisibilityConverter}, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                        Command="{Binding DataContext.EditCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" 
+                        CommandParameter="{Binding}" />
+                        <Button Content="Удалить" 
+                        Visibility="{Binding DataContext.IsShowAllProductsCommandExecuted, Converter={StaticResource BooleanToVisibilityConverter}, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                        Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" 
+                        CommandParameter="{Binding}" />
+                    </StackPanel>
+                </DataTemplate>
+            </DataGrid.RowDetailsTemplate>
+        </DataGrid>
+
+
     </Grid>
 </Window>
