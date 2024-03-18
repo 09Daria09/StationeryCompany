@@ -1,24 +1,17 @@
 ﻿using StationeryCompany.Commands;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.SqlClient;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Input;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
 using Microsoft.VisualBasic;
 using StationeryCompany.View;
-using System.Windows.Media;
-using System.Windows.Markup;
-using System.Reflection;
-using System.Reflection.Metadata;
-using static StationeryCompany.View.EditManagers;
-
+using System.Windows.Forms;
+using StationeryCompany.Model;
+using Microsoft.EntityFrameworkCore;
+using System.Windows.Input;
+using Microsoft.Data.SqlClient;
 namespace StationeryCompany.ViewModel
 {
     internal class ViewModelStationery : INotifyPropertyChanged
@@ -37,6 +30,38 @@ namespace StationeryCompany.ViewModel
                 }
             }
         }
+        private ObservableCollection<ProductViewModel> _products = new ObservableCollection<ProductViewModel>();
+
+        public ObservableCollection<ProductViewModel> Products
+        {
+            get { return _products; }
+            set
+            {
+                _products = value;
+                OnPropertyChanged(nameof(Products));
+            }
+        }
+        public ObservableCollection<ProductTypeViewModel> ProductTypes { get; set; } = new ObservableCollection<ProductTypeViewModel>();
+
+        private void LoadProductTypes()
+        {
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var types = db.ProductTypes.ToList();
+                    foreach (var type in types)
+                    {
+                        ProductTypes.Add(new ProductTypeViewModel(type));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
+        }
+
         public ObservableCollection<MenuItem> MenuItems { get; set; }
         public ObservableCollection<MenuItem> MenuItems1 { get; set; }
         public ObservableCollection<MenuItem> MenuItems2 { get; set; }
@@ -68,9 +93,9 @@ namespace StationeryCompany.ViewModel
 
         public ICommand EditCommand { get; }
 
-        public ICommand AddManagerCommand {  get; private set; }
+        public ICommand AddManagerCommand { get; private set; }
         public ICommand AddCompanyCommand { get; private set; }
-        public ICommand AddProductsCommand {  get; private set; }
+        public ICommand AddProductsCommand { get; private set; }
         public ICommand AddProductCommand { get; private set; }
 
         private bool _isShowAllProductsCommandExecuted;
@@ -84,9 +109,9 @@ namespace StationeryCompany.ViewModel
             }
         }
 
-        public ViewModelStationery(string connect)
+        public ViewModelStationery()
         {
-            connection = connect;
+            LoadProductTypes();
             MenuItems = new ObservableCollection<MenuItem>();
             InitializeMenuItems();
             MenuItems1 = new ObservableCollection<MenuItem>();
@@ -98,7 +123,6 @@ namespace StationeryCompany.ViewModel
             ShowAllProductTypesCommand = new DelegateCommand(ShowAllProductTypes, (object parameter) => true);
             ShowAllSalesManagersCommand = new DelegateCommand(ShowAllSalesManagers, (object parameter) => true);
             ShowAllCompaniesCommand = new DelegateCommand(ShowAllCompanies, (object parameter) => true);
-            ShowAllSalesCommand = new DelegateCommand(ShowAllSales, (object parameter) => true);
 
             ShowProductsWithMaxQuantityCommand = new DelegateCommand(ShowProductsWithMaxQuantity, (object parameter) => true);
             ShowProductsWithMinQuantityCommand = new DelegateCommand(ShowProductsWithMinQuantity, (object parameter) => true);
@@ -106,19 +130,10 @@ namespace StationeryCompany.ViewModel
             ShowProductsWithMaxCostCommand = new DelegateCommand(ShowProductsWithMaxCost, (object parameter) => true);
             ShowProductsByTypeCommand = new DelegateCommand(ShowProductsByType, (object parameter) => true);
             ShowProductsSoldByManagerCommand = new DelegateCommand(ShowProductsSoldByManager, (object parameter) => true);
-            ShowProductsBoughtByCompanyCommand = new DelegateCommand(ShowProductsBoughtByCompany, (object parameter) => true);
+            ShowProductsBoughtByCompanyCommand = new DelegateCommand(ShowProductsBoughtByCompanyAsync, (object parameter) => true);
             ShowLatestSaleInfoCommand = new DelegateCommand(ShowLatestSaleInfo, (object parameter) => true);
-            ShowAverageQuantityByTypeCommand = new DelegateCommand(ShowAverageQuantityByType, (object parameter) => true);
-            ShowTopSellingManagerByUnitsCommand = new DelegateCommand(ShowTopSellingManagerByUnits, (object parameter) => true);
-            ShowTopSellingManagerByProfitCommand = new DelegateCommand(ShowTopSellingManagerByProfit, (object parameter) => true);
-            ShowUnsoldProductsCommand = new DelegateCommand(ShowUnsoldProducts, (object parameter) => true);
-            ShowTopCustomerCompanyBySpendingCommand = new DelegateCommand(ShowTopCustomerCompanyBySpending, (object parameter) => true);
-            ShowTopProductTypeByUnitsSoldCommand = new DelegateCommand(ShowTopProductTypeByUnitsSold, (object parameter) => true);
-            ShowTopProfitableProductTypeCommand = new DelegateCommand(ShowTopProfitableProductType, (object parameter) => true);
-            ShowMostPopularProductsCommand = new DelegateCommand(ShowMostPopularProducts, (object parameter) => true);
-            ShowTopSellingManagerByProfitInPeriodCommand = new DelegateCommand(ShowTopSellingManagerByProfitInPeriod, (object parameter) => true);
 
-            DeleteCommand = new DelegateCommand(Delete, (object parameter) => true);
+            DeleteCommand = new DelegateCommand(DeleteAsync, (object parameter) => true);
             EditCommand = new DelegateCommand(Edit, (object parameter) => true);
 
             AddManagerCommand = new DelegateCommand(AddManager, (object parameter) => true);
@@ -131,14 +146,14 @@ namespace StationeryCompany.ViewModel
 
         private void AddProduct(object obj)
         {
-            EditProducts edit = new EditProducts("Добавление продукта", "Добавить", connection);
+            EditProducts edit = new EditProducts("Добавление продукта", "Добавить");
             edit.ShowDialog();
             ShowAllProducts("ShowAllProducts");
         }
 
         private void AddProducts(object obj)
         {
-            EditOrAddProductType edit = new EditOrAddProductType("Добавление типа продукта", "Добавить", connection);
+            EditOrAddProductType edit = new EditOrAddProductType("Добавление типа продукта", "Добавить");
             edit.ShowDialog();
             ShowAllProductTypes("ShowAllProductTypes");
             InitializeMenuItems();
@@ -147,7 +162,7 @@ namespace StationeryCompany.ViewModel
 
         private void AddCompany(object obj)
         {
-            EditCompanies editManager = new EditCompanies("Добавление компании", "Добавить", connection);
+            EditCompanies editManager = new EditCompanies("Добавление компании", "Добавить");
             editManager.ShowDialog();
             ShowAllCompanies("ShowAllCompaniesWithOrderCount");
             InitializeMenuItems2();
@@ -155,7 +170,7 @@ namespace StationeryCompany.ViewModel
 
         private void AddManager(object obj)
         {
-            EditManagers editManager = new EditManagers("Добавление менеджера", "Добавить", connection);
+            EditManagers editManager = new EditManagers("Добавление менеджера", "Добавить");
             editManager.ShowDialog();
             ShowAllSalesManagers("ShowAllSalesManagers");
             InitializeMenuItems1();
@@ -166,33 +181,33 @@ namespace StationeryCompany.ViewModel
             if (obj is DataRowView dataRowView)
             {
                 DataRow selectedRow = dataRowView.Row;
-                var entityID = selectedRow.ItemArray[0];
+                int entityID = (int)selectedRow.ItemArray[0];
 
                 if (obj is DataRowView table)
                 {
-                    if (table.DataView.Table.TableName == "ShowAllProducts")
+                    if (table.DataView.Table.TableName == "Products")
                     {
-                        EditProducts edit = new EditProducts("Изменение продукта", "Изменить", entityID, connection);
+                        EditProducts edit = new EditProducts("Изменение продукта", "Изменить", entityID);
                         edit.ShowDialog();
                         ShowAllProducts("ShowAllProducts");
                     }
-                    if (table.DataView.Table.TableName == "ShowAllProductTypes")
+                    if (table.DataView.Table.TableName == "ProductTypes")
                     {
-                        EditOrAddProductType edit = new EditOrAddProductType("Изменение типа продукта", "Изменить", entityID, connection);
+                        EditOrAddProductType edit = new EditOrAddProductType("Изменение типа продукта", "Изменить", entityID);
                         edit.ShowDialog();
                         ShowAllProductTypes("ShowAllProductTypes");
                         InitializeMenuItems();
                     }
-                    if (table.DataView.Table.TableName == "ShowAllSalesManagers")
+                    if (table.DataView.Table.TableName == "SalesManagers")
                     {
-                        EditManagers editManager = new EditManagers("Изменение менеджера", "Изменить", entityID, connection);
+                        EditManagers editManager = new EditManagers("Изменение менеджера", "Изменить", entityID);
                         editManager.ShowDialog();
                         ShowAllSalesManagers("ShowAllSalesManagers");
                         InitializeMenuItems1();
                     }
-                    if (table.DataView.Table.TableName == "ShowAllCompaniesWithOrderCount")
+                    if (table.DataView.Table.TableName == "CompaniesWithOrderCount")
                     {
-                        EditCompanies editManager = new EditCompanies("Изменение компании", "Изменить", entityID, connection);
+                        EditCompanies editManager = new EditCompanies("Изменение компании", "Изменить", entityID);
                         editManager.ShowDialog();
                         ShowAllCompanies("ShowAllCompaniesWithOrderCount");
                         InitializeMenuItems2();
@@ -203,262 +218,531 @@ namespace StationeryCompany.ViewModel
         }
 
 
-        private void Delete(object obj)
+        private async void DeleteAsync(object obj)
         {
-            var result = MessageBox.Show("Вы уверены, что хотите удалить этот компонент?", "Подтверждение удаления", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var result = System.Windows.MessageBox.Show("Вы уверены, что хотите удалить этот компонент?", "Подтверждение удаления", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
             if (result == MessageBoxResult.Yes)
             {
                 if (obj is DataRowView table)
                 {
-                    if (table.DataView.Table.TableName == "ShowAllProducts")
+                    string storedProcedureName = null;
+                    string parameterName = null;
+                    object parameterValue = null;
+
+                    switch (table.DataView.Table.TableName)
                     {
-                        DeleteEntityFromTable(obj, "DeleteProduct", "@ProductID", () => ShowAllProducts("ShowAllProducts"));
+                        case "Products":
+                            storedProcedureName = "DeleteProduct";
+                            parameterName = "@ProductID";
+                            parameterValue = table["Id"];
+                            break;
+                        case "ProductTypes":
+                            storedProcedureName = "DeleteProductTypeAndRelatedProducts";
+                            parameterName = "@TypeID";
+                            parameterValue = table["Id"];
+                            break;
+                        case "SalesManagers":
+                            storedProcedureName = "DeleteSalesManagerAndRelatedSales";
+                            parameterName = "@ManagerID";
+                            parameterValue = table["Id"];
+                            break;
+                        case "CompaniesWithOrderCount":
+                            storedProcedureName = "DeleteSalesCompaniesAndRelatedSales";
+                            parameterName = "@CompaniesID";
+                            parameterValue = table["Id"];
+                            break;
                     }
-                    if (table.DataView.Table.TableName == "ShowAllProductTypes")
+
+                    if (storedProcedureName != null)
                     {
-                        DeleteEntityFromTable(obj, "DeleteProductTypeAndRelatedProducts", "@TypeID", () =>
+                        using (var db = new StationeryCompanyContext())
                         {
-                            ShowAllProducts("ShowAllProductTypes");
-                            InitializeMenuItems();
-                        });
-                    }
-                    if (table.DataView.Table.TableName == "ShowAllSalesManagers")
-                    {
-                        DeleteEntityFromTable(obj, "DeleteSalesManagerAndRelatedSales", "@ManagerID", () =>
-                        {
-                            ShowAllSalesManagers("ShowAllSalesManagers");
-                            InitializeMenuItems1();
-                        });
-                    }
-                    if (table.DataView.Table.TableName == "ShowAllCompaniesWithOrderCount")
-                    {
-                        DeleteEntityFromTable(obj, "DeleteSalesCompaniesAndRelatedSales", "@CompaniesID", () =>
-                        {
-                            ShowAllCompanies("ShowAllCompaniesWithOrderCount");
-                            InitializeMenuItems2();
-                        });
+                            await db.Database.ExecuteSqlRawAsync($"EXEC {storedProcedureName} {parameterName} = {parameterValue}");
+                        }
+                        RefreshUI(table.DataView.Table.TableName);
                     }
                 }
             }
         }
-        private void DeleteEntityFromTable(object obj, string storedProcedureName, string parameterName, Action postDeleteAction)
+
+        private void RefreshUI(string tableName)
         {
-            if (obj is DataRowView dataRowView)
+            switch (tableName)
             {
-                DataRow selectedRow = dataRowView.Row;
-                var entityID = selectedRow.ItemArray[0];
-                var parameters = new Dictionary<string, object>
-        {
-            { parameterName, entityID }
-        };
-                ExecuteStoredProcedureNonQuery(storedProcedureName, parameters);
-                postDeleteAction?.Invoke(); //если есть еще какой-то компонент 
+                case "Products":
+                    ShowAllProducts("ShowAllProducts");
+                    break;
+                case "ProductTypes":
+                    ShowAllProductTypes("ShowAllProductTypes");
+                    InitializeMenuItems();
+                    break;
+                case "SalesManagers":
+                    ShowAllSalesManagers("ShowAllSalesManagers");
+                    InitializeMenuItems1();
+                    break;
+                case "CompaniesWithOrderCount":
+                    ShowAllCompanies("ShowAllCompaniesWithOrderCount");
+                    InitializeMenuItems2();
+                    break;
             }
         }
 
-        private void ShowAllSales(object obj)
-        {
-            ExecuteStoredProcedure("GetAllSalesDetails");
-            IsShowAllProductsCommandExecuted = false;
-        }
         private void ShowAllCompanies(object obj)
         {
-            ExecuteStoredProcedure("ShowAllCompaniesWithOrderCount");
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var companies = db.CustomerCompanies
+                                      .FromSqlRaw("EXEC ShowAllCompaniesWithOrderCount")
+                                      .ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("Id", typeof(int));
+                    dataTable.Columns.Add("Название Компании", typeof(string));
+                    dataTable.Columns.Add("Номер Телефона", typeof(string));
+                    dataTable.Columns.Add("Город", typeof(string));
+                    dataTable.Columns.Add("Количество Заказов", typeof(int));
+
+                    foreach (var company in companies)
+                    {
+                        dataTable.Rows.Add(company.CompanyId, company.CompanyName, company.PhoneNumber, company.City);
+                    }
+                    ProductsData = dataTable;
+                    ProductsData.TableName = "CompaniesWithOrderCount";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
             IsShowAllProductsCommandExecuted = true;
-        }
-
-        private void ShowTopSellingManagerByProfitInPeriod(object obj) /*Нужно изменить отображение InputBox*/
-        {
-            DateTime startDate, endDate;
-            bool isStartDateValid = false;
-            bool isEndDateValid = false;
-
-            do
-            {
-                string inputStartDate = Interaction.InputBox("Введите начальную дату периода для анализа (например, 2024-01-01)", "Запрос начальной даты периода", "2024-01-01");
-                if (DateTime.TryParse(inputStartDate, out startDate))
-                {
-                    isStartDateValid = true;
-                }
-                else
-                {
-                    MessageBox.Show("Введенная начальная дата не является допустимым форматом даты. Пожалуйста, введите дату корректно.", "Ошибка", MessageBoxButton.OK);
-                }
-            }
-            while (!isStartDateValid);
-
-            do
-            {
-                string inputEndDate = Interaction.InputBox("Введите конечную дату периода для анализа (например, 2024-01-30)", "Запрос конечной даты периода", "2024-01-30");
-                if (DateTime.TryParse(inputEndDate, out endDate) && endDate >= startDate)
-                {
-                    isEndDateValid = true;
-                }
-                else
-                {
-                    MessageBox.Show("Введенная конечная дата не является допустимым форматом даты или меньше начальной даты. Пожалуйста, введите дату корректно.", "Ошибка", MessageBoxButton.OK);
-                }
-            }
-            while (!isEndDateValid);
-
-            var parameters = new Dictionary<string, object>
-    {
-        { "@StartDate", startDate },
-        { "@EndDate", endDate }
-    };
-
-            ExecuteStoredProcedure("ShowTopSellingManagerByProfitInPeriod", parameters);
-            IsShowAllProductsCommandExecuted = false;
-        }
-
-
-        private void ShowUnsoldProducts(object obj)
-        {
-            string input = Interaction.InputBox("Введите количество дней", "Запрос количества дней", "30");
-            int days = 0;
-            if (int.TryParse(input, out days))
-            {
-                var parameters = new Dictionary<string, object>
-        {
-            { "@DaysNotSold", days }
-        };
-                ExecuteStoredProcedure("ShowUnsoldProducts", parameters);
-                IsShowAllProductsCommandExecuted = false;
-            }
-        }
-
-        private void ShowMostPopularProducts(object obj)
-        {
-            ExecuteStoredProcedure("ShowMostPopularProducts");
-            IsShowAllProductsCommandExecuted = false;
-        }
-
-        private void ShowTopProfitableProductType(object obj)
-        {
-            ExecuteStoredProcedure("ShowTopProfitableProductType");
-            IsShowAllProductsCommandExecuted = false;
-        }
-
-        private void ShowTopProductTypeByUnitsSold(object obj)
-        {
-            ExecuteStoredProcedure("ShowTopProductType");
-            IsShowAllProductsCommandExecuted = false;
-        }
-
-        private void ShowTopCustomerCompanyBySpending(object obj)
-        {
-            ExecuteStoredProcedure("ShowTopCustomer");
-            IsShowAllProductsCommandExecuted = false;
-        }
-
-        private void ShowTopSellingManagerByProfit(object obj)
-        {
-            ExecuteStoredProcedure("ShowTopByProfit");
-            IsShowAllProductsCommandExecuted = false;
-        }
-
-        private void ShowTopSellingManagerByUnits(object obj)
-        {
-            ExecuteStoredProcedure("ShowTopManager");
-            IsShowAllProductsCommandExecuted = false;
-        }
-
-        private void ShowAverageQuantityByType(object obj)
-        {
-            ExecuteStoredProcedure("ShowAverageQuantityByProductType");
-            IsShowAllProductsCommandExecuted = false;
         }
 
         private void ShowLatestSaleInfo(object obj)
         {
-            ExecuteStoredProcedure("ShowLatestSale");
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var salesInfo = db.Sales
+                                      .FromSqlRaw("EXEC ShowLatestSale")
+                                      .ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ProductName", typeof(string));
+                    dataTable.Columns.Add("ManagerName", typeof(string));
+                    dataTable.Columns.Add("CompanyName", typeof(string));
+
+                    foreach (var info in salesInfo)
+                    {
+                        var productName = ProductTypes.FirstOrDefault(pt => pt.TypeId == info.ProductId)?.TypeName ?? "Unknown";
+
+                        dataTable.Rows.Add(
+                            productName,
+                            info.QuantitySold,
+                            info.PricePerUnit
+                        );
+                    }
+                    ProductsData = dataTable;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
             IsShowAllProductsCommandExecuted = false;
         }
 
-        private void ShowProductsBoughtByCompany(object obj)
+
+
+
+        private async void ShowProductsBoughtByCompanyAsync(object companyName)
         {
-            var typeName = obj as string;
-            if (typeName == null) return;
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var companyNameParameter = new Microsoft.Data.SqlClient.SqlParameter("@CompanyName", companyName);
 
-            var parameters = new Dictionary<string, object>
-    {
-        { "@CompanyName", typeName }
-    };
+                    var commandText = "SELECT * FROM ProductsBoughtByCompany(@CompanyName)";
+                    var products = await db.Products.FromSqlRaw(commandText, companyNameParameter).ToListAsync();
 
-            ExecuteStoredProcedure("ShowProductsBoughtByCompany", parameters);
-            IsShowAllProductsCommandExecuted = false;
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ProductId", typeof(int));
+                    dataTable.Columns.Add("ProductName", typeof(string));
+                    dataTable.Columns.Add("QuantitySold", typeof(int));
+                    dataTable.Columns.Add("TotalSaleAmount", typeof(decimal));
+
+                    foreach (var product in products)
+                    {
+                        dataTable.Rows.Add(product.ProductId, product.ProductName, product.Quantity, product.Cost); 
+                    }
+
+                    ProductsData = dataTable;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
         }
 
-        private void ShowProductsSoldByManager(object obj)
+
+
+
+
+        private async void ShowProductsSoldByManager(object obj)
         {
-            var typeName = obj as string;
-            if (typeName == null) return;
+            try
+            {
+                var managerName = obj as string;
+                if (managerName == null) return;
 
-            var parameters = new Dictionary<string, object>
-    {
-        { "@ManagerName", typeName }
-    };
+                using (var db = new StationeryCompanyContext())
+                {
+                    var managerNameParameter = new Microsoft.Data.SqlClient.SqlParameter("@ManagerName", managerName);
+                    var sales = await db.Sales
+                                        .FromSqlRaw("EXEC GetSalesByManager @ManagerName", managerNameParameter)
+                                        .ToListAsync();
 
-            ExecuteStoredProcedure("ShowProductsSoldByManager", parameters);
-            IsShowAllProductsCommandExecuted = false;
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ID Продажи", typeof(int));
+                    dataTable.Columns.Add("Тип Продукта", typeof(string));
+                    dataTable.Columns.Add("Менеджер", typeof(string));
+                    dataTable.Columns.Add("Количество проданного", typeof(int));
+                    dataTable.Columns.Add("Цена за единицу", typeof(decimal));
+                    dataTable.Columns.Add("Общая сумма продаж", typeof(decimal)); 
+
+                    foreach (var sale in sales)
+                    {
+                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == sale.ProductId)?.TypeName ?? "Unknown";
+
+                        dataTable.Rows.Add(
+                            sale.SaleId,
+                            typeName,
+                            managerName, 
+                            sale.QuantitySold,
+                            sale.PricePerUnit,
+                            sale.QuantitySold * sale.PricePerUnit 
+                            );
+                    }
+                    ProductsData = dataTable; 
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message); 
+            }
         }
-        private void ShowProductsByType(object obj)
+
+
+
+        private async void ShowProductsByType(object obj)
         {
-            var typeName = obj as string;
-            if (typeName == null) return;
+            try
+            {
+                var typeName = obj as string;
+                if (typeName == null) return;
 
-            var parameters = new Dictionary<string, object>
-    {
-        { "@TypeName", typeName }
-    };
+                using (var db = new StationeryCompanyContext())
+                {
+                    var typeNameParameter = new Microsoft.Data.SqlClient.SqlParameter("@TypeName", typeName);
 
-            ExecuteStoredProcedure("ShowProductsByType", parameters);
+                    var products = await db.Products
+                                           .FromSqlRaw("EXEC ShowProductsByType @TypeName", typeNameParameter)
+                                           .ToListAsync();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ID Продукта", typeof(int));
+                    dataTable.Columns.Add("Название", typeof(string));
+                    dataTable.Columns.Add("Тип", typeof(string));
+                    dataTable.Columns.Add("Количество", typeof(int));
+                    dataTable.Columns.Add("Стоимость", typeof(decimal));
+
+                    foreach (var product in products)
+                    {
+                        dataTable.Rows.Add(
+                            product.ProductId,
+                            product.ProductName,
+                            typeName,
+                            product.Quantity,
+                            product.Cost
+                        );
+                    }
+                    ProductsData = dataTable;
+
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
             IsShowAllProductsCommandExecuted = false;
         }
+
+
 
         private void ShowProductsWithMaxCost(object obj)
         {
-            ExecuteStoredProcedure("ShowProductsWithMaxCost");
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var products = db.Products
+                                     .FromSqlRaw("EXEC ShowProductsWithMaxCost")
+                                     .ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ID Продукта", typeof(int));
+                    dataTable.Columns.Add("Название Продукта", typeof(string));
+                    dataTable.Columns.Add("Тип Продукта", typeof(string));
+                    dataTable.Columns.Add("Количество", typeof(int));
+                    dataTable.Columns.Add("Цена за единицу", typeof(decimal));
+
+                    foreach (var product in products)
+                    {
+                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+
+                        dataTable.Rows.Add(
+                            product.ProductId,
+                            product.ProductName,
+                            typeName,
+                            product.Quantity,
+                            product.Cost
+                        );
+                    }
+                    ProductsData = dataTable;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
             IsShowAllProductsCommandExecuted = false;
         }
 
         private void ShowProductsWithMinCost(object obj)
         {
-            ExecuteStoredProcedure("ShowProductsWithMinCost");
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var products = db.Products
+                                     .FromSqlRaw("EXEC ShowProductsWithMinCost")
+                                     .ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ID Продукта", typeof(int));
+                    dataTable.Columns.Add("Название Продукта", typeof(string));
+                    dataTable.Columns.Add("Тип Продукта", typeof(string));
+                    dataTable.Columns.Add("Количество", typeof(int));
+                    dataTable.Columns.Add("Цена за единицу", typeof(decimal));
+
+                    foreach (var product in products)
+                    {
+                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+
+                        dataTable.Rows.Add(
+                            product.ProductId,
+                            product.ProductName,
+                            typeName,
+                            product.Quantity,
+                            product.Cost
+                        );
+                    }
+                    ProductsData = dataTable;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
             IsShowAllProductsCommandExecuted = false;
+
         }
 
         private void ShowProductsWithMinQuantity(object obj)
         {
-            ExecuteStoredProcedure("ShowProductsWithMinQuantity");
-            IsShowAllProductsCommandExecuted = false;
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var products = db.Products
+                                     .FromSqlRaw("EXEC ShowProductsWithMinQuantity")
+                                     .ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ID Продукта", typeof(int));
+                    dataTable.Columns.Add("Название Продукта", typeof(string));
+                    dataTable.Columns.Add("Тип Продукта", typeof(string));
+                    dataTable.Columns.Add("Количество", typeof(int));
+                    dataTable.Columns.Add("Цена за единицу", typeof(decimal));
+
+                    foreach (var product in products)
+                    {
+                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+
+                        dataTable.Rows.Add(
+                            product.ProductId,
+                            product.ProductName,
+                            typeName,
+                            product.Quantity,
+                            product.Cost
+                        );
+                    }
+                    ProductsData = dataTable;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
+            IsShowAllProductsCommandExecuted = true;
+
         }
 
         private void ShowProductsWithMaxQuantity(object obj)
         {
-            ExecuteStoredProcedure("ShowProductsWithMaxQuantity");
-            IsShowAllProductsCommandExecuted = false;
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var products = db.Products
+                                     .FromSqlRaw("EXEC ShowProductsWithMaxQuantity")
+                                     .ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("ID Продукта", typeof(int));
+                    dataTable.Columns.Add("Название Продукта", typeof(string));
+                    dataTable.Columns.Add("Тип Продукта", typeof(string));
+                    dataTable.Columns.Add("Количество", typeof(int));
+                    dataTable.Columns.Add("Цена за единицу", typeof(decimal));
+
+                    foreach (var product in products)
+                    {
+                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+
+                        dataTable.Rows.Add(
+                            product.ProductId,
+                            product.ProductName,
+                            typeName,
+                            product.Quantity,
+                            product.Cost
+                        );
+                    }
+                    ProductsData = dataTable;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
+            IsShowAllProductsCommandExecuted = true;
         }
+
+
+
 
         private void ShowAllSalesManagers(object obj)
         {
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var managers = db.SalesManagers.FromSqlRaw("EXEC ShowAllSalesManagers").ToList();
 
-            ExecuteStoredProcedure("ShowAllSalesManagers");
-            IsShowAllProductsCommandExecuted = true;
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("Id", typeof(int));
+                    dataTable.Columns.Add("Имя Менеджера", typeof(string));
+                    dataTable.Columns.Add("Номер Телефона", typeof(string));
+
+                    foreach (var manager in managers)
+                    {
+                        dataTable.Rows.Add(manager.ManagerId, manager.ManagerName, manager.PhoneNumber);
+                    }
+                    ProductsData = dataTable;
+                    ProductsData.TableName = "SalesManagers";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
+            IsShowAllProductsCommandExecuted = true; 
         }
+
 
         private void ShowAllProductTypes(object obj)
         {
-            ExecuteStoredProcedure("ShowAllProductTypes");
-            IsShowAllProductsCommandExecuted = true;
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var productTypes = db.ProductTypes.FromSqlRaw("EXEC ShowAllProductTypes").ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.Columns.Add("Id", typeof(int));
+                    dataTable.Columns.Add("Тип продукта", typeof(string));
+
+                    foreach (var type in productTypes)
+                    {
+                        dataTable.Rows.Add(type.TypeId, type.TypeName);
+                    }
+                    ProductsData = dataTable;
+                    ProductsData.TableName = "ProductTypes";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
+            IsShowAllProductsCommandExecuted = true; 
         }
+
 
         private void ShowAllProducts(object obj)
         {
-            ExecuteStoredProcedure("ShowAllProducts");
+            LoadProductTypes();
+            try
+            {
+                using (var db = new StationeryCompanyContext())
+                {
+                    var products = db.Products.FromSqlRaw("EXEC ShowAllProducts").ToList();
+
+                    DataTable dataTable = new DataTable();
+                    dataTable.TableName = "Products";
+                    dataTable.Columns.Add("Id", typeof(int));
+                    dataTable.Columns.Add("Продукт", typeof(string));
+                    dataTable.Columns.Add("Тип продукта", typeof(string));
+                    dataTable.Columns.Add("Количество", typeof(int));
+                    dataTable.Columns.Add("Стоимость", typeof(decimal));
+
+                    foreach (var product in products)
+                    {
+                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+
+                        dataTable.Rows.Add(
+                            product.ProductId,
+                            product.ProductName,
+                            typeName,
+                            product.Quantity,
+                            product.Cost
+                        );
+                    }
+
+                    ProductsData = dataTable;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+            }
             IsShowAllProductsCommandExecuted = true;
         }
+
+
         public async void InitializeMenuItems()
         {
             var productTypes = await GetCategoriesAsync();
@@ -515,145 +799,69 @@ namespace StationeryCompany.ViewModel
         }
         public async Task<List<string>> GetCompanyNamesAsync()
         {
-            var companyNames = new List<string>();
-            using (var connect = new SqlConnection(connection))
+            try
             {
-                await connect.OpenAsync();
-                var command = new SqlCommand("SELECT DISTINCT CompanyName FROM CustomerCompanies ORDER BY CompanyName", connect);
-                using (var reader = await command.ExecuteReaderAsync())
+                using (var db = new StationeryCompanyContext())
                 {
-                    while (await reader.ReadAsync())
-                    {
-                        companyNames.Add(reader.GetString(0));
-                    }
+                    var companyNames = await db.CustomerCompanies
+                                               .Select(cc => cc.CompanyName)
+                                               .Distinct()
+                                               .OrderBy(cc => cc)
+                                               .ToListAsync();
+
+                    return companyNames;
                 }
             }
-            return companyNames;
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+                return new List<string>();
+            }
         }
+
 
         public async Task<List<string>> GetManagerNamesAsync()
         {
-            var managerNames = new List<string>();
-            using (var connect = new SqlConnection(connection))
+            try
             {
-                await connect.OpenAsync();
-                var command = new SqlCommand("SELECT DISTINCT ManagerName FROM SalesManagers ORDER BY ManagerName", connect);
-                using (var reader = await command.ExecuteReaderAsync())
+                using (var db = new StationeryCompanyContext())
                 {
-                    while (await reader.ReadAsync())
-                    {
-                        managerNames.Add(reader.GetString(0));
-                    }
+                    var managerNames = await db.SalesManagers
+                                               .Select(sm => sm.ManagerName)
+                                               .Distinct()
+                                               .OrderBy(sm => sm)
+                                               .ToListAsync();
+
+                    return managerNames;
                 }
             }
-            return managerNames;
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+                return new List<string>();
+            }
         }
+
         public async Task<List<string>> GetCategoriesAsync()
         {
-            var productTypes = new List<string>();
-            using (var connect = new SqlConnection(connection))
+            try
             {
-                await connect.OpenAsync();
-                var command = new SqlCommand("SELECT DISTINCT TypeName FROM ProductTypes", connect);
-                using (var reader = await command.ExecuteReaderAsync())
+                using (var db = new StationeryCompanyContext())
                 {
-                    while (await reader.ReadAsync())
-                    {
-                        productTypes.Add(reader.GetString(0));
-                    }
+                    var productTypes = await db.ProductTypes
+                                               .Select(pt => pt.TypeName)
+                                               .Distinct()
+                                               .ToListAsync();
+
+                    return productTypes;
                 }
             }
-            return productTypes;
-        }
-
-        private void ExecuteStoredProcedure(string procedureName)
-        {
-            using (SqlConnection connect = new SqlConnection(connection))
+            catch (Exception ex)
             {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                DataTable dataTable = new DataTable();
-                dataTable.TableName = procedureName;
-                try
-                {
-                    connect.Open();
-                    using (SqlDataReader reader = cmd.ExecuteReader())
-                    {
-                        dataTable.Load(reader);
-                    }
-                    ProductsData = dataTable;
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
+                System.Windows.MessageBox.Show(ex.Message);
+                return new List<string>();
             }
         }
-        private void ExecuteStoredProcedure(string procedureName, Dictionary<string, object> procedureParams = null)
-        {
-            using (SqlConnection connect = new SqlConnection(connection))
-            {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                if (procedureParams != null)
-                {
-                    foreach (var param in procedureParams)
-                    {
-                        cmd.Parameters.AddWithValue(param.Key, param.Value);
-                    }
-                }
-
-                DataTable dataTable = new DataTable();
-                try
-                {
-                    connect.Open();
-                    using (SqlDataReader reader = cmd.ExecuteReader())
-                    {
-                        dataTable.Load(reader);
-                    }
-                    ProductsData = dataTable;
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
-            }
-        }
-        private void ExecuteStoredProcedureNonQuery(string procedureName, Dictionary<string, object> procedureParams = null)
-        {
-            using (SqlConnection connect = new SqlConnection(connection))
-            {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                if (procedureParams != null)
-                {
-                    foreach (var param in procedureParams)
-                    {
-                        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                    }
-                }
-
-                try
-                {
-                    connect.Open();
-                    cmd.ExecuteNonQuery();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
-            }
-        }
-
 
         public event PropertyChangedEventHandler PropertyChanged;
 

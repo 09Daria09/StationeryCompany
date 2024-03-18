@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows;
+using StationeryCompany.Model;
 
 namespace StationeryCompany.ViewModel
 {
@@ -73,12 +74,14 @@ namespace StationeryCompany.ViewModel
         public ICommand ChangeOrEditCommand { get; set; }
         public string originalTypeName = "";
         public string originalPhone = "";
-        public ViewModelAddManager(string Title, string Content, string connection) 
+        public ViewModelAddManager(string Title, string Content) 
         {
             WindowTitle = Title;
             ContentButt = Content;
-            connectionString = connection;
-            ChangeOrEditCommand = new DelegateCommand(Add, CanAdd);
+            ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
+            {
+                await AddAsync(parameter);
+            }, CanAdd);
         }
 
         private bool CanAdd(object obj)
@@ -86,34 +89,33 @@ namespace StationeryCompany.ViewModel
             return !string.IsNullOrWhiteSpace(NameManader) && !string.IsNullOrWhiteSpace(Phone);
         }
 
-        private void Add(object obj)
+        private async Task AddAsync(object parameter)
         {
-            string procedureName = "AddSalesManager";
-            using (SqlConnection connect = new SqlConnection(connectionString))
+            using (var context = new StationeryCompanyContext()) 
             {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
+                var newManager = new SalesManager
                 {
-                    CommandType = CommandType.StoredProcedure
+                    ManagerName = NameManader, 
+                    PhoneNumber = Phone 
                 };
-
-                cmd.Parameters.AddWithValue("@ManagerName", NameManader);
-                cmd.Parameters.AddWithValue("@PhoneNumber", Phone);
 
                 try
                 {
-                    connect.Open();
-                    cmd.ExecuteNonQuery(); 
+                    context.SalesManagers.Add(newManager); 
+                    await context.SaveChangesAsync(); 
+
                     MessageBox.Show("Менеджер успешно добавлен.");
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Ошибка при добавлении менеджера: {ex.Message}");
                 }
-            }
-            NameManader = "";
-            Phone = "";
 
+                NameManader = "";
+                Phone = "";
+            }
         }
+
 
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -11,6 +11,7 @@ using System.Windows.Input;
 using System.Windows;
 using System.Collections.ObjectModel;
 using StationeryCompany.Model;
+using Microsoft.EntityFrameworkCore;
 
 namespace StationeryCompany.ViewModel
 {
@@ -60,8 +61,8 @@ namespace StationeryCompany.ViewModel
             }
         }
 
-        private decimal _cost;
-        public decimal Cost
+        private int _cost;
+        public int Cost
         {
             get => _cost;
             set
@@ -101,61 +102,91 @@ namespace StationeryCompany.ViewModel
             }
         }
 
-        private ObservableCollection<ProductType> _productTypes;
-        public ObservableCollection<ProductType> ProductTypes
+        private ObservableCollection<ProductTypeViewModel> _productType = new ObservableCollection<ProductTypeViewModel>(); 
+        public ObservableCollection<ProductTypeViewModel> ProductType
         {
-            get => _productTypes;
+            get => _productType;
             set
             {
-                if (_productTypes != value)
+                if (_productType != value)
                 {
-                    _productTypes = value;
-                    OnPropertyChanged(nameof(ProductTypes));
+                    _productType = value;
+                    OnPropertyChanged(nameof(ProductType));
                 }
             }
         }
-        public object? ID;
+
+        private ProductTypeViewModel _selectedProductType;
+        public ProductTypeViewModel SelectedProductType
+        {
+            get => _selectedProductType;
+            set
+            {
+                if (_selectedProductType != value)
+                {
+                    _selectedProductType = value;
+                    OnPropertyChanged(nameof(SelectedProductType));
+                }
+            }
+        }
+
+        public int? ID;
         public ICommand ChangeOrEditCommand { get; set; }
 
         public string originalProductName = ""; 
         public int originalQuantity;
         public decimal originalCost;
         public int originalTypeID = 0;
-        public ViewModelEditProducts(string Title, string Content, object? ID, string connection) 
+        public ViewModelEditProducts(string Title, string Content, int? ID) 
         {
             WindowTitle = Title;
             ContentButt = Content;
             this.ID = ID;
-            this.connection = connection;
-            LoadProductInfo();
-            LoadProductTypes();
-            ChangeOrEditCommand = new DelegateCommand(EditProduct, (object parameter) => true);
+            ProductType = new ObservableCollection<ProductTypeViewModel>();
+            LoadProductInfoAsync();
+            LoadProductTypesAsync();
+            ChangeOrEditCommand = new DelegateCommand(
+    async (object parameter) =>
+    {
+        await EditProductAsync(parameter);
+    },
+    (object parameter) => true);
+
         }
 
-        private void EditProduct(object obj)
+        private async Task EditProductAsync(object obj)
         {
             if (ProductName != originalProductName || TypeID != originalTypeID ||
                 Quantity != originalQuantity || Cost != originalCost)
             {
                 var result = MessageBox.Show("Данные продукта были изменены. Вы уверены, что хотите сохранить изменения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
                 if (result == MessageBoxResult.Yes)
                 {
-                    var parameters = new Dictionary<string, object>
-            {
-                { "@ProductID", ID }, 
-                { "@ProductName", ProductName },
-                { "@TypeID", TypeID },
-                { "@Quantity", Quantity },
-                { "@Cost", Cost }
-            };
+                    using (var context = new StationeryCompanyContext())
+                    {
+                        var product = await context.Products.FirstOrDefaultAsync(p => p.ProductId == ID);
+                        if (product != null)
+                        {
+                            product.ProductName = ProductName;
+                            product.TypeId = SelectedProductType.TypeId;
+                            product.Quantity = Quantity;
+                            product.Cost = Cost;
 
-                    ExecuteStoredProcedureNonQuery("UpdateProduct", parameters);
-                    MessageBox.Show("Информация о продукте успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+                            await context.SaveChangesAsync();
 
-                    originalProductName = ProductName;
-                    originalTypeID = TypeID;
-                    originalQuantity = Quantity;
-                    originalCost = Cost;
+                            MessageBox.Show("Информация о продукте успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                            originalProductName = ProductName;
+                            originalTypeID = TypeID;
+                            originalQuantity = Quantity;
+                            originalCost = Cost;
+                        }
+                        else
+                        {
+                            MessageBox.Show("Продукт не найден.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
                 }
                 else
                 {
@@ -169,29 +200,34 @@ namespace StationeryCompany.ViewModel
         }
 
 
-        public void LoadProductTypes()
-        {
-            ProductTypes = new ObservableCollection<ProductType>();
-            using (SqlConnection connect = new SqlConnection(connection))
-            {
-                SqlCommand command = new SqlCommand("ShowAllProductTypes", connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
 
+        public async Task LoadProductTypesAsync()
+        {
+            using (var context = new StationeryCompanyContext())
+            {
                 try
                 {
-                    connect.Open();
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    var productTypes = await context.ProductTypes
+                        .Include(pt => pt.Products)
+                        .ToListAsync();
+
+                    ProductType.Clear();
+
+                    ProductTypeViewModel selectedTypeViewModel = null;
+                    foreach (var type in productTypes)
                     {
-                        while (reader.Read())
+                        var typeViewModel = new ProductTypeViewModel(type);
+                        ProductType.Add(typeViewModel);
+
+                        if (type.Products.Any(p => p.ProductId == ID))
                         {
-                            ProductTypes.Add(new ProductType
-                            {
-                                TypeID = reader.GetInt32(reader.GetOrdinal("ID типа")),
-                                TypeName = reader.GetString(reader.GetOrdinal("Название типа"))
-                            });
+                            selectedTypeViewModel = typeViewModel;
                         }
+                    }
+
+                    if (selectedTypeViewModel != null)
+                    {
+                        SelectedProductType = selectedTypeViewModel; 
                     }
                 }
                 catch (Exception ex)
@@ -201,47 +237,40 @@ namespace StationeryCompany.ViewModel
             }
         }
 
-        public void LoadProductInfo()
+
+
+
+
+        public async Task LoadProductInfoAsync()
         {
-            using (SqlConnection connect = new SqlConnection(connection))
+            using (var context = new StationeryCompanyContext()) 
             {
-                SqlCommand cmd = new SqlCommand("GetProductById", connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                cmd.Parameters.AddWithValue("@ProductID", ID);
-
                 try
                 {
-                    connect.Open();
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    var product = await context.Products
+                        .Where(p => p.ProductId == ID) 
+                        .Select(p => new
+                        {
+                            p.ProductName,
+                            p.Quantity,
+                            p.Cost,
+                            p.Type.TypeId
+                        })
+                        .FirstOrDefaultAsync();
+
+                    if (product != null)
                     {
-                        if (reader.Read())
-                        {
-                            ProductName = reader.IsDBNull(reader.GetOrdinal("ProductName"))
-                                ? "Неизвестный продукт"
-                                : reader.GetString(reader.GetOrdinal("ProductName"));
-
-                            Quantity = reader.IsDBNull(reader.GetOrdinal("Quantity"))
-                                ? 0
-                                : reader.GetInt32(reader.GetOrdinal("Quantity"));
-
-                            Cost = reader.IsDBNull(reader.GetOrdinal("Cost"))
-                                ? 0
-                                : reader.GetDecimal(reader.GetOrdinal("Cost"));
-
-                             TypeID = reader.IsDBNull(reader.GetOrdinal("TypeID"))
-                                 ? 0
-                                 : reader.GetInt32(reader.GetOrdinal("TypeID"));
-                        }
-                        else
-                        {
-                            ProductName = "Продукт не найден.";
-                            Quantity = 0;
-                            Cost = 0;
-                            TypeID = 0; 
-                        }
+                        ProductName = product.ProductName ?? "Неизвестный продукт";
+                        Quantity = (int)product.Quantity; 
+                        Cost = (int)product.Cost; 
+                        TypeID = product.TypeId; 
+                    }
+                    else
+                    {
+                        ProductName = "Продукт не найден.";
+                        Quantity = 0;
+                        Cost = 0;
+                        TypeID = 0;
                     }
                 }
                 catch (Exception ex)
@@ -249,36 +278,8 @@ namespace StationeryCompany.ViewModel
                     MessageBox.Show($"Ошибка загрузки данных продукта: {ex.Message}");
                 }
             }
-        }
+    }
 
-        private void ExecuteStoredProcedureNonQuery(string procedureName, Dictionary<string, object> procedureParams = null)
-        {
-            using (SqlConnection connect = new SqlConnection(connection))
-            {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                if (procedureParams != null)
-                {
-                    foreach (var param in procedureParams)
-                    {
-                        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                    }
-                }
-
-                try
-                {
-                    connect.Open();
-                    cmd.ExecuteNonQuery();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
-            }
-        }
 
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -17,10 +17,10 @@ namespace StationeryCompany
     /// </summary>
     public partial class MainWindow : Window
     {
-        public MainWindow(string connect)
+        public MainWindow()
         {
             InitializeComponent();
-            this.DataContext = new ViewModelStationery(connect);
+            this.DataContext = new ViewModelStationery();
         }
     }
 }

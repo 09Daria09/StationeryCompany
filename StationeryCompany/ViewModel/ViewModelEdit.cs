@@ -54,10 +54,10 @@ namespace StationeryCompany.ViewModel
                 }
             }
         }
-        public object? IDproductsType;
+        public int? IDproductsType;
         public ICommand ChangeOrEditCommand {  get; set; }
         public string originalTypeName = "";
-        public ViewModelEdit(string Title, string Content, object? ID, string connection)
+        public ViewModelEdit(string Title, string Content, int? ID)
         {
             WindowTitle = Title;
             ContentButt = Content;

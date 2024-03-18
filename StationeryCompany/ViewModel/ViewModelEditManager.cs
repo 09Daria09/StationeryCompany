@@ -9,6 +9,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows;
+using StationeryCompany.Model;
+using Microsoft.EntityFrameworkCore;
 
 namespace StationeryCompany.ViewModel
 {
@@ -68,36 +70,52 @@ namespace StationeryCompany.ViewModel
                 }
             }
         }
-        public object? ID;
+        public int? ID;
         public ICommand ChangeOrEditCommand { get; set; }
         public string originalTypeName = "";
         public string originalPhone = ""; 
-        public ViewModelEditManager(string Title, string Content, object? ID, string connection)
+        public ViewModelEditManager(string Title, string Content, int? ID)
         {
             WindowTitle = Title;
             ContentButt = Content;
             this.ID = ID;
             this.connection = connection;
-            LoadProductType();
-            ChangeOrEditCommand = new DelegateCommand(Edit, (object parameter) => true);
+            LoadManagerByIdAsync();
+            ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
+            {
+                await EditAsync(parameter);
+            }, (object parameter) => true);
         }
 
-        private void Edit(object obj)
+        private async Task EditAsync(object parameter)
         {
             if (NameManader != originalTypeName || Phone != originalPhone)
             {
                 var result = MessageBox.Show("Текст был изменен. Вы уверены, что хотите сохранить изменения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (result == MessageBoxResult.Yes)
                 {
-                    var parameters = new Dictionary<string, object>
-            {
-                { "@ManagerID", ID },
-                { "@ManagerName", NameManader },
-                {"@PhoneNumber",  Phone}
-            };
+                    using (var context = new StationeryCompanyContext())
+                    {
+                        var manager = await context.SalesManagers.FindAsync(ID);
+                        if (manager != null)
+                        {
+                            manager.ManagerName = NameManader;
+                            manager.PhoneNumber = Phone;
 
-                    ExecuteStoredProcedureNonQuery("UpdateSalesManager", parameters);
-                    MessageBox.Show("Информация о менеджере успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+                            try
+                            {
+                                await context.SaveChangesAsync();
+                                MessageBox.Show("Информация о менеджере успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                                originalTypeName = NameManader;
+                                originalPhone = Phone;
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Ошибка при обновлении менеджера: {ex.Message}");
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -108,52 +126,41 @@ namespace StationeryCompany.ViewModel
             {
                 MessageBox.Show("Изменений не обнаружено.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-
         }
 
 
-        public void LoadProductType()
+
+        public async Task LoadManagerByIdAsync()
         {
-
-            using (SqlConnection connect = new SqlConnection(connection))
+            using (var context = new StationeryCompanyContext()) 
             {
-                SqlCommand cmd = new SqlCommand("GetManagerById", connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                cmd.Parameters.AddWithValue("@ManagerID", ID);
-
                 try
                 {
-                    connect.Open();
-                    using (SqlDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            NameManader = reader.IsDBNull(reader.GetOrdinal("ManagerName"))
-                                ? "Неизвестный тип"
-                                : reader.GetString(reader.GetOrdinal("ManagerName"));
-                            originalTypeName = NameManader;
+                    var manager = await context.SalesManagers
+                        .Where(m => m.ManagerId == ID) 
+                        .Select(m => new { m.ManagerName, m.PhoneNumber }) 
+                        .FirstOrDefaultAsync();
 
-                            Phone = reader.IsDBNull(reader.GetOrdinal("PhoneNumber"))
-                               ? "Неизвестный тип"
-                               : reader.GetString(reader.GetOrdinal("PhoneNumber"));
-                            originalPhone = Phone;
-                        }
-                        else
-                        {
-                            NameManader = "Менеджер не найден.";
-                            NameManader = "???";
-                        }
+                    if (manager != null)
+                    {
+                        NameManader = manager.ManagerName ?? "Неизвестный тип";
+                        Phone = manager.PhoneNumber ?? "Неизвестный тип";
+                        originalTypeName = NameManader;
+                        originalPhone = Phone;
+                    }
+                    else
+                    {
+                        NameManader = "Менеджер не найден.";
+                        Phone = "???";
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message);
+                    MessageBox.Show($"Ошибка при загрузке данных менеджера: {ex.Message}");
                 }
             }
         }
+
         private void ExecuteStoredProcedureNonQuery(string procedureName, Dictionary<string, object> procedureParams = null)
         {
             using (SqlConnection connect = new SqlConnection(connection))

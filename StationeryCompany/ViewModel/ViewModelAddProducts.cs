@@ -11,6 +11,8 @@ using System.Windows.Input;
 using System.Windows;
 using StationeryCompany.Model;
 using System.Collections.ObjectModel;
+using Microsoft.EntityFrameworkCore;
+using System.Reflection.Metadata;
 
 namespace StationeryCompany.ViewModel
 {
@@ -101,16 +103,30 @@ namespace StationeryCompany.ViewModel
             }
         }
 
-        private ObservableCollection<ProductType> _productTypes;
-        public ObservableCollection<ProductType> ProductTypes
+        private ObservableCollection<ProductTypeViewModel> _productType = new ObservableCollection<ProductTypeViewModel>();
+        public ObservableCollection<ProductTypeViewModel> ProductType
         {
-            get => _productTypes;
+            get => _productType;
             set
             {
-                if (_productTypes != value)
+                if (_productType != value)
                 {
-                    _productTypes = value;
-                    OnPropertyChanged(nameof(ProductTypes));
+                    _productType = value;
+                    OnPropertyChanged(nameof(ProductType));
+                }
+            }
+        }
+
+        private ProductTypeViewModel _selectedProductType;
+        public ProductTypeViewModel SelectedProductType
+        {
+            get => _selectedProductType;
+            set
+            {
+                if (_selectedProductType != value)
+                {
+                    _selectedProductType = value;
+                    OnPropertyChanged(nameof(SelectedProductType));
                 }
             }
         }
@@ -120,34 +136,41 @@ namespace StationeryCompany.ViewModel
         public int originalQuantity;
         public decimal originalCost;
         public int originalTypeID = 0;
-        public ViewModelAddProducts(string Title, string Content, string connection)
+        public ViewModelAddProducts(string Title, string Content)
         {
             WindowTitle = Title;
             ContentButt = Content;
-            connectionString = connection;
-            LoadProductTypes();
-            ChangeOrEditCommand = new DelegateCommand(Add, CanAdd);
+            LoadProductTypesAsync();
+            ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
+            {
+                await AddAsync(parameter);
+            }, (object parameter) => CanAdd()
+);
+
         }
 
-        private void Add(object obj)
+        private async Task AddAsync(object obj)
         {
-            using (SqlConnection connect = new SqlConnection(connectionString))
+            using (var context = new StationeryCompanyContext())
             {
-                SqlCommand cmd = new SqlCommand("AddProduct", connect)
+                var newProduct = new Product
                 {
-                    CommandType = CommandType.StoredProcedure
+                    ProductName = this.ProductName,
+                    TypeId = SelectedProductType.TypeId,
+                    Quantity = this.Quantity,
+                    Cost = this.Cost
                 };
-
-                cmd.Parameters.AddWithValue("@ProductName", ProductName);
-                cmd.Parameters.AddWithValue("@TypeID", TypeID);
-                cmd.Parameters.AddWithValue("@Quantity", Quantity);
-                cmd.Parameters.AddWithValue("@Cost", Cost);
 
                 try
                 {
-                    connect.Open();
-                    cmd.ExecuteNonQuery(); 
+                    await context.Products.AddAsync(newProduct);
+                    await context.SaveChangesAsync();
                     MessageBox.Show("Продукт успешно добавлен.");
+
+                    ProductName = string.Empty; 
+                    SelectedProductType = null;
+                    Quantity = 0; 
+                    Cost = 0; 
                 }
                 catch (Exception ex)
                 {
@@ -156,34 +179,29 @@ namespace StationeryCompany.ViewModel
             }
         }
 
-        private bool CanAdd(object obj)
+
+
+        private bool CanAdd()
         {
-            return !string.IsNullOrWhiteSpace(ProductName) && Quantity > 0 && Cost > 0 && TypeID > 0;
+            return !string.IsNullOrWhiteSpace(ProductName) && Quantity > 0 && Cost > 0;
         }
 
-        public void LoadProductTypes()
+        public async Task LoadProductTypesAsync()
         {
-            ProductTypes = new ObservableCollection<ProductType>();
-            using (SqlConnection connect = new SqlConnection(connectionString))
-            {
-                SqlCommand command = new SqlCommand("ShowAllProductTypes", connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
 
+            using (var context = new StationeryCompanyContext())
+            {
                 try
                 {
-                    connect.Open();
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    var productTypes = await context.ProductTypes
+                        .Include(pt => pt.Products)
+                        .ToListAsync();
+
+                    ProductType.Clear();
+
+                    foreach (var type in productTypes)
                     {
-                        while (reader.Read())
-                        {
-                            ProductTypes.Add(new ProductType
-                            {
-                                TypeID = reader.GetInt32(reader.GetOrdinal("ID типа")),
-                                TypeName = reader.GetString(reader.GetOrdinal("Название типа"))
-                            });
-                        }
+                        ProductType.Add(new ProductTypeViewModel(type));
                     }
                 }
                 catch (Exception ex)

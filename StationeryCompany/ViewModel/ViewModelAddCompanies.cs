@@ -9,6 +9,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+using StationeryCompany.Model;
 
 namespace StationeryCompany.ViewModel
 {
@@ -82,14 +84,16 @@ namespace StationeryCompany.ViewModel
                 }
             }
         }
-        public object? IDproductsType;
+        public int? IDproductsType;
         public ICommand ChangeOrEditCommand { get; set; }
-        public ViewModelAddCompanies(string Title, string Content, string connection) 
+        public ViewModelAddCompanies(string Title, string Content) 
         {
             WindowTitle = Title;
             ContentButt = Content;
-            connectionString = connection;
-            ChangeOrEditCommand = new DelegateCommand(Add, CanAdd);
+            ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
+            {
+                await AddCompanyAsync(parameter);
+            }, CanAdd);
         }
 
         private bool CanAdd(object obj)
@@ -97,36 +101,34 @@ namespace StationeryCompany.ViewModel
             return !string.IsNullOrWhiteSpace(CompanyName) && !string.IsNullOrWhiteSpace(PhoneNumber) && !string.IsNullOrWhiteSpace(City);
         }
 
-        private void Add(object obj)
+        private async Task AddCompanyAsync(object param)
         {
-            string procedureName = "AddCustomerCompany";
-            using (SqlConnection connect = new SqlConnection(connectionString))
+            using (var context = new StationeryCompanyContext()) 
             {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
+                var newCompany = new CustomerCompany
                 {
-                    CommandType = CommandType.StoredProcedure
+                    CompanyName = CompanyName,
+                    PhoneNumber = PhoneNumber,
+                    City = City
                 };
-
-                cmd.Parameters.AddWithValue("@CompanyName", CompanyName);
-                cmd.Parameters.AddWithValue("@PhoneNumber", PhoneNumber);
-                cmd.Parameters.AddWithValue("@City", City);
 
                 try
                 {
-                    connect.Open();
-                    cmd.ExecuteNonQuery();
-                    MessageBox.Show("Компания успешно добавлен.");
+                    await context.CustomerCompanies.AddAsync(newCompany); 
+                    await context.SaveChangesAsync(); 
+                    MessageBox.Show("Компания успешно добавлена.");
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Ошибка при добавлении компании: {ex.Message}");
                 }
-            }
-            CompanyName = "";
-            PhoneNumber = "";
-            City = "";
 
+                CompanyName = "";
+                PhoneNumber = "";
+                City = "";
+            }
         }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName = null)

@@ -9,6 +9,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows;
+using StationeryCompany.Model;
+using Microsoft.EntityFrameworkCore;
 
 namespace StationeryCompany.ViewModel
 {
@@ -82,38 +84,55 @@ namespace StationeryCompany.ViewModel
                 }
             }
         }
-        public object? IDproductsType;
+        public int? IDproductsType;
         public ICommand ChangeOrEditCommand { get; set; }
         public string originalCompanyName = "";
         public string originalPhoneNumber = "";
         public string originalCity = "";
-        public ViewModelEditCompanies(string Title, string Content, object? ID, string connection) 
+        public ViewModelEditCompanies(string Title, string Content, int? ID) 
         {
             WindowTitle = Title;
             ContentButt = Content;
             IDproductsType = ID;
             this.connection = connection;
-            LoadProductType();
-            ChangeOrEditCommand = new DelegateCommand(Edit, (object parameter) => true);
+            LoadCompanyByIdAsync();
+            ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
+            {
+                await EditAsync(parameter);
+            }, (object parameter) => true);
         }
 
-        private void Edit(object obj)
+        private async Task EditAsync(object parameter)
         {
             if (CompanyName != originalCompanyName || PhoneNumber != originalPhoneNumber || City != originalCity)
             {
                 var result = MessageBox.Show("Текст был изменен. Вы уверены, что хотите сохранить изменения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (result == MessageBoxResult.Yes)
                 {
-                    var parameters = new Dictionary<string, object>
-            {
-                { "@CompanyID", IDproductsType },
-                { "@CompanyName", CompanyName },
-                { "@PhoneNumber", PhoneNumber },
-                { "@City", City }
-            };
+                    using (var context = new StationeryCompanyContext()) 
+                    {
+                        var company = await context.CustomerCompanies.FindAsync(IDproductsType);
+                        if (company != null)
+                        {
+                            company.CompanyName = CompanyName;
+                            company.PhoneNumber = PhoneNumber;
+                            company.City = City;
 
-                    ExecuteStoredProcedureNonQuery("UpdateCustomerCompany", parameters);
-                    MessageBox.Show("Информация о компании успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+                            try
+                            {
+                                await context.SaveChangesAsync();
+                                MessageBox.Show("Информация о компании успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                                originalCompanyName = CompanyName;
+                                originalPhoneNumber = PhoneNumber;
+                                originalCity = City;
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Ошибка при обновлении компании: {ex.Message}");
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -124,84 +143,43 @@ namespace StationeryCompany.ViewModel
             {
                 MessageBox.Show("Изменений не обнаружено.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+        }
 
-    }
 
-        public void LoadProductType()
+        public async Task LoadCompanyByIdAsync()
         {
-
-            using (SqlConnection connect = new SqlConnection(connection))
+            using (var context = new StationeryCompanyContext()) 
             {
-                SqlCommand cmd = new SqlCommand("GetCompaniesById", connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                cmd.Parameters.AddWithValue("@CompanyID", IDproductsType);
-
                 try
                 {
-                    connect.Open();
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    var company = await context.CustomerCompanies
+                        .Where(c => c.CompanyId == IDproductsType) 
+                        .Select(c => new { c.CompanyName, c.PhoneNumber, c.City }) 
+                        .FirstOrDefaultAsync();
+
+                    if (company != null)
                     {
-                        if (reader.Read())
-                        {
-                            CompanyName = reader.IsDBNull(reader.GetOrdinal("CompanyName"))
-                                ? "Неизвестный тип"
-                                : reader.GetString(reader.GetOrdinal("CompanyName"));
-                            originalCompanyName = CompanyName;
+                        CompanyName = company.CompanyName ?? "Неизвестный тип";
+                        PhoneNumber = company.PhoneNumber ?? "Неизвестный тип";
+                        City = company.City ?? "Неизвестный тип";
 
-                            PhoneNumber = reader.IsDBNull(reader.GetOrdinal("PhoneNumber"))
-                                ? "Неизвестный тип"
-                                : reader.GetString(reader.GetOrdinal("PhoneNumber"));
-                            originalPhoneNumber = PhoneNumber;
-
-                            City = reader.IsDBNull(reader.GetOrdinal("City"))
-                                ? "Неизвестный тип"
-                                : reader.GetString(reader.GetOrdinal("City"));
-                            originalCity = City;
-                        }
-                        else
-                        {
-                            CompanyName = "Компания не найдена.";
-                        }
+                        originalCompanyName = CompanyName;
+                        originalPhoneNumber = PhoneNumber;
+                        originalCity = City;
+                    }
+                    else
+                    {
+                        CompanyName = "Компания не найдена.";
+                        PhoneNumber = "Неизвестный тип";
+                        City = "Неизвестный тип";
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message);
+                    MessageBox.Show($"Ошибка при загрузке данных компании: {ex.Message}");
                 }
             }
         }
-        private void ExecuteStoredProcedureNonQuery(string procedureName, Dictionary<string, object> procedureParams = null)
-        {
-            using (SqlConnection connect = new SqlConnection(connection))
-            {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                if (procedureParams != null)
-                {
-                    foreach (var param in procedureParams)
-                    {
-                        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                    }
-                }
-
-                try
-                {
-                    connect.Open();
-                    cmd.ExecuteNonQuery();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
-            }
-        }
-
 
         public event PropertyChangedEventHandler PropertyChanged;
 

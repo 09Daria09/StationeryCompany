@@ -20,15 +20,15 @@ namespace StationeryCompany.View
     /// </summary>
     public partial class EditOrAddProductType : Window
     {
-        public EditOrAddProductType(string title, string Content, object? ID, string connection)
+        public EditOrAddProductType(string title, string Content, int? ID)
         {
             InitializeComponent();
-            this.DataContext = new ViewModelEdit(title, Content, ID, connection);
+            this.DataContext = new ViewModelEdit(title, Content, ID);
         }
-        public EditOrAddProductType(string title, string Content, string connection)
+        public EditOrAddProductType(string title, string Content)
         {
             InitializeComponent();
-            this.DataContext = new ViewModelAddTypeProduct(title, Content, connection);
+            this.DataContext = new ViewModelAddTypeProduct(title, Content);
         }
     }
 }

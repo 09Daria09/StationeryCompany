@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows;
+using StationeryCompany.Model;
 
 namespace StationeryCompany.ViewModel
 {
@@ -55,47 +56,50 @@ namespace StationeryCompany.ViewModel
                 }
             }
         }
-        public object? IDproductsType;
+        public int? IDproductsType;
         public ICommand ChangeOrEditCommand { get; set; }
         public string originalTypeName = "";
-        public ViewModelAddTypeProduct(string Title, string Content, string connection)
+        public ViewModelAddTypeProduct(string Title, string Content)
         { 
             WindowTitle = Title;
             ContentButt = Content;
-            connectionString = connection;
-            ChangeOrEditCommand = new DelegateCommand(Add, CanAdd);
+            ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
+            {
+                await AddProductTypeAsync(parameter);
+            }, (object parameter) => CanAdd()
+);
         }
 
-        private bool CanAdd(object obj)
+        private bool CanAdd()
         {
             return !string.IsNullOrWhiteSpace(TextProductType);
         }
 
-        private void Add(object obj)
+        private async Task AddProductTypeAsync(object parameter)
         {
-            string procedureName = "AddProductType";
-            using (SqlConnection connect = new SqlConnection(connectionString))
+            using (var context = new StationeryCompanyContext())
             {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
+                var newProductType = new ProductType
                 {
-                    CommandType = CommandType.StoredProcedure
+                    TypeName = TextProductType
                 };
-
-                cmd.Parameters.AddWithValue("@TypeName", TextProductType);
 
                 try
                 {
-                    connect.Open();
-                    cmd.ExecuteNonQuery();
+                    await context.ProductTypes.AddAsync(newProductType); 
+                    await context.SaveChangesAsync(); 
+
                     MessageBox.Show("Тип товара успешно добавлен.");
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Ошибка при добавлении типа товара: {ex.Message}");
                 }
+
+                TextProductType = "";
             }
-            TextProductType = "";
         }
+
 
         public event PropertyChangedEventHandler PropertyChanged;
 

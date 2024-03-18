@@ -71,19 +71,8 @@
                     <MenuItem Header="Канцтовары, проданные менеджером" Command="{Binding ShowProductsSoldByManagerCommand}" ItemsSource="{Binding MenuItems1}"/>
                     <MenuItem Header="Канцтовары, купленные фирмой" Command="{Binding ShowProductsBoughtByCompanyCommand}" ItemsSource="{Binding MenuItems2}"/>
                     <MenuItem Header="Информация о последней продаже" Command="{Binding ShowLatestSaleInfoCommand}"/>
-                    <MenuItem Header="Среднее количество товаров по типу" Command="{Binding ShowAverageQuantityByTypeCommand}"/>
                 </MenuItem>
                 
-                <MenuItem Header="Показ информации" FontSize="18">
-                    <MenuItem Header="Менеджер с наибольшим количеством продаж по единицам" Command="{Binding ShowTopSellingManagerByUnitsCommand}"/>
-                    <MenuItem Header="Менеджер с наибольшей общей суммой прибыли" Command="{Binding ShowTopSellingManagerByProfitCommand}"/>
-                    <MenuItem Header="Менеджер с наибольшей общей суммой прибыли за период" Command="{Binding ShowTopSellingManagerByProfitInPeriodCommand}"/>
-                    <MenuItem Header="Фирма покупатель, купившая на самую большую сумму" Command="{Binding ShowTopCustomerCompanyBySpendingCommand}"/>
-                    <MenuItem Header="Тип канцтоваров с наибольшим количеством продаж" Command="{Binding ShowTopProductTypeByUnitsSoldCommand}"/>
-                    <MenuItem Header="Самый прибыльный тип канцтоваров" Command="{Binding ShowTopProfitableProductTypeCommand}"/>
-                    <MenuItem Header="Самые популярные канцтовары" Command="{Binding ShowMostPopularProductsCommand}"/>
-                    <MenuItem Header="Канцтовары, не продававшиеся заданное количество дней" Command="{Binding ShowUnsoldProductsCommand}"/>
-                </MenuItem>
                 <MenuItem Header="Добавление" FontSize="18">
                     <MenuItem Header="Добавить тип продукт" Command="{Binding AddProductsCommand}"/>
                     <MenuItem Header="Добавить менеджера" Command="{Binding AddManagerCommand}"/>
