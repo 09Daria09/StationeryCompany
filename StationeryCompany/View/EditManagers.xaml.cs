@@ -21,16 +21,16 @@ namespace StationeryCompany.View
     /// </summary>
     public partial class EditManagers : Window
     {
-        public EditManagers(string title, string content, int? id)
+        public EditManagers(string title, string content, int? id, string connection)
         {
             InitializeComponent();
-            this.DataContext = new ViewModelEditManager(title, content, id);
+            this.DataContext = new ViewModelEditManager(title, content, id, connection);
 
         }
-        public EditManagers(string title, string content)
+        public EditManagers(string title, string content, string connection)
         {
             InitializeComponent();  
-            this.DataContext = new ViewModelAddManager(title, content);
+            this.DataContext = new ViewModelAddManager(title, content, connection);
         }
     }
 }

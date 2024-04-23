@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows;
 using StationeryCompany.Model;
+using Dapper;
 
 namespace StationeryCompany.ViewModel
 {
@@ -59,10 +60,11 @@ namespace StationeryCompany.ViewModel
         public int? IDproductsType;
         public ICommand ChangeOrEditCommand { get; set; }
         public string originalTypeName = "";
-        public ViewModelAddTypeProduct(string Title, string Content)
+        public ViewModelAddTypeProduct(string Title, string Content, string connection)
         { 
             WindowTitle = Title;
             ContentButt = Content;
+            connectionString = connection;
             ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
             {
                 await AddProductTypeAsync(parameter);
@@ -77,26 +79,29 @@ namespace StationeryCompany.ViewModel
 
         private async Task AddProductTypeAsync(object parameter)
         {
-            using (var context = new StationeryCompanyContext())
+            try
             {
-                var newProductType = new ProductType
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    TypeName = TextProductType
-                };
+                    await connection.OpenAsync();
 
-                try
-                {
-                    await context.ProductTypes.AddAsync(newProductType); 
-                    await context.SaveChangesAsync(); 
+                    var parameters = new
+                    {
+                        TypeName = TextProductType
+                    };
+
+                    var query = @"INSERT INTO ProductTypes (TypeName) VALUES (@TypeName)";
+
+                    await connection.ExecuteAsync(query, parameters);
 
                     MessageBox.Show("Тип товара успешно добавлен.");
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при добавлении типа товара: {ex.Message}");
-                }
 
                 TextProductType = "";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при добавлении типа товара: {ex.Message}");
             }
         }
 

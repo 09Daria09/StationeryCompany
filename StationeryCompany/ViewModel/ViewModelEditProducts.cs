@@ -12,12 +12,14 @@ using System.Windows;
 using System.Collections.ObjectModel;
 using StationeryCompany.Model;
 using Microsoft.EntityFrameworkCore;
+using Dapper;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace StationeryCompany.ViewModel
 {
     class ViewModelEditProducts : INotifyPropertyChanged
     {
-        public string connection;
+        public string connectionString; 
         public string _windowTitle;
         public string WindowTitle
         {
@@ -137,8 +139,9 @@ namespace StationeryCompany.ViewModel
         public int originalQuantity;
         public decimal originalCost;
         public int originalTypeID = 0;
-        public ViewModelEditProducts(string Title, string Content, int? ID) 
+        public ViewModelEditProducts(string Title, string Content, int? ID, string connection) 
         {
+            connectionString = connection;
             WindowTitle = Title;
             ContentButt = Content;
             this.ID = ID;
@@ -163,29 +166,46 @@ namespace StationeryCompany.ViewModel
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    using (var context = new StationeryCompanyContext())
+                    try
                     {
-                        var product = await context.Products.FirstOrDefaultAsync(p => p.ProductId == ID);
-                        if (product != null)
+                        using (var connection = new SqlConnection(connectionString))
                         {
-                            product.ProductName = ProductName;
-                            product.TypeId = SelectedProductType.TypeId;
-                            product.Quantity = Quantity;
-                            product.Cost = Cost;
+                            await connection.OpenAsync();
 
-                            await context.SaveChangesAsync();
+                            var affectedRows = await connection.ExecuteAsync(
+                                @"UPDATE Products
+                          SET ProductName = @ProductName,
+                              TypeID = @TypeID,
+                              Quantity = @Quantity,
+                              Cost = @Cost
+                          WHERE ProductID = @ProductId",
+                                new
+                                {
+                                    ProductName,
+                                    TypeID,
+                                    Quantity,
+                                    Cost,
+                                    ProductId = ID
+                                });
 
-                            MessageBox.Show("Информация о продукте успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+                            if (affectedRows > 0)
+                            {
+                                MessageBox.Show("Информация о продукте успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                            originalProductName = ProductName;
-                            originalTypeID = TypeID;
-                            originalQuantity = Quantity;
-                            originalCost = Cost;
+                                originalProductName = ProductName;
+                                originalTypeID = TypeID;
+                                originalQuantity = Quantity;
+                                originalCost = Cost;
+                            }
+                            else
+                            {
+                                MessageBox.Show("Продукт не найден или ни одна строка не была обновлена.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
                         }
-                        else
-                        {
-                            MessageBox.Show("Продукт не найден.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при обновлении информации о продукте: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
                 else
@@ -201,15 +221,16 @@ namespace StationeryCompany.ViewModel
 
 
 
+
         public async Task LoadProductTypesAsync()
         {
-            using (var context = new StationeryCompanyContext())
+            try
             {
-                try
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    var productTypes = await context.ProductTypes
-                        .Include(pt => pt.Products)
-                        .ToListAsync();
+                    await connection.OpenAsync();
+
+                    var productTypes = await connection.QueryAsync<ProductType>("SELECT * FROM ProductTypes");
 
                     ProductType.Clear();
 
@@ -219,7 +240,11 @@ namespace StationeryCompany.ViewModel
                         var typeViewModel = new ProductTypeViewModel(type);
                         ProductType.Add(typeViewModel);
 
-                        if (type.Products.Any(p => p.ProductId == ID))
+                        var products = await connection.QueryAsync<Product>(
+                            "SELECT * FROM Products WHERE TypeID = @TypeId",
+                            new { TypeId = type.TypeId });
+
+                        if (products.Any(p => p.ProductId == ID))
                         {
                             selectedTypeViewModel = typeViewModel;
                         }
@@ -227,13 +252,13 @@ namespace StationeryCompany.ViewModel
 
                     if (selectedTypeViewModel != null)
                     {
-                        SelectedProductType = selectedTypeViewModel; 
+                        SelectedProductType = selectedTypeViewModel;
                     }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка загрузки типов продуктов: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки типов продуктов: {ex.Message}");
             }
         }
 
@@ -241,29 +266,30 @@ namespace StationeryCompany.ViewModel
 
 
 
+
         public async Task LoadProductInfoAsync()
         {
-            using (var context = new StationeryCompanyContext()) 
+            try
             {
-                try
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    var product = await context.Products
-                        .Where(p => p.ProductId == ID) 
-                        .Select(p => new
-                        {
-                            p.ProductName,
-                            p.Quantity,
-                            p.Cost,
-                            p.Type.TypeId
-                        })
-                        .FirstOrDefaultAsync();
+                    await connection.OpenAsync();
+
+                    var product = await connection.QueryFirstOrDefaultAsync<Product>(
+                        @"SELECT p.ProductName,
+                         p.Quantity,
+                         p.Cost,
+                         p.TypeID
+                  FROM Products p
+                  WHERE p.ProductID = @ProductId",
+                        new { ProductId = ID });
 
                     if (product != null)
                     {
                         ProductName = product.ProductName ?? "Неизвестный продукт";
-                        Quantity = (int)product.Quantity; 
-                        Cost = (int)product.Cost; 
-                        TypeID = product.TypeId; 
+                        Quantity = product.Quantity ?? 0;
+                        Cost = (int)(product.Cost ?? 0);
+                        TypeID = product.TypeId ?? 0;
                     }
                     else
                     {
@@ -273,13 +299,12 @@ namespace StationeryCompany.ViewModel
                         TypeID = 0;
                     }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка загрузки данных продукта: {ex.Message}");
-                }
             }
-    }
-
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки данных продукта: {ex.Message}");
+            }
+        }
 
 
         public event PropertyChangedEventHandler PropertyChanged;

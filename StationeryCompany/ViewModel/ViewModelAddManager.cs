@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows;
 using StationeryCompany.Model;
+using Dapper;
 
 namespace StationeryCompany.ViewModel
 {
@@ -74,10 +75,11 @@ namespace StationeryCompany.ViewModel
         public ICommand ChangeOrEditCommand { get; set; }
         public string originalTypeName = "";
         public string originalPhone = "";
-        public ViewModelAddManager(string Title, string Content) 
+        public ViewModelAddManager(string Title, string Content, string connection) 
         {
             WindowTitle = Title;
             ContentButt = Content;
+            connectionString = connection;
             ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
             {
                 await AddAsync(parameter);
@@ -91,28 +93,31 @@ namespace StationeryCompany.ViewModel
 
         private async Task AddAsync(object parameter)
         {
-            using (var context = new StationeryCompanyContext()) 
+            try
             {
-                var newManager = new SalesManager
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    ManagerName = NameManader, 
-                    PhoneNumber = Phone 
-                };
+                    await connection.OpenAsync();
 
-                try
-                {
-                    context.SalesManagers.Add(newManager); 
-                    await context.SaveChangesAsync(); 
+                    var parameters = new
+                    {
+                        ManagerName = NameManader,
+                        PhoneNumber = Phone
+                    };
+
+                    var query = @"INSERT INTO SalesManagers (ManagerName, PhoneNumber) VALUES (@ManagerName, @PhoneNumber)";
+
+                    await connection.ExecuteAsync(query, parameters);
 
                     MessageBox.Show("Менеджер успешно добавлен.");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при добавлении менеджера: {ex.Message}");
                 }
 
                 NameManader = "";
                 Phone = "";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при добавлении менеджера: {ex.Message}");
             }
         }
 

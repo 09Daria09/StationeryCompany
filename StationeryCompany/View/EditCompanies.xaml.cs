@@ -20,15 +20,15 @@ namespace StationeryCompany.View
     /// </summary>
     public partial class EditCompanies : Window
     {
-        public EditCompanies(string title, string Content, int? ID)
+        public EditCompanies(string title, string Content, int? ID, string connection)
         {
             InitializeComponent();
-            this.DataContext = new ViewModelEditCompanies(title, Content, ID);
+            this.DataContext = new ViewModelEditCompanies(title, Content, ID, connection);
         }
-        public EditCompanies(string title, string Content)
+        public EditCompanies(string title, string Content, string connection)
         {
             InitializeComponent();
-            this.DataContext = new ViewModelAddCompanies(title, Content); 
+            this.DataContext = new ViewModelAddCompanies(title, Content, connection); 
         }
     }
 }

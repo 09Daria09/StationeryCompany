@@ -12,11 +12,15 @@ using StationeryCompany.Model;
 using Microsoft.EntityFrameworkCore;
 using System.Windows.Input;
 using Microsoft.Data.SqlClient;
+using System.Configuration;
+using Dapper;
+using Microsoft.Extensions.Configuration;
+using System.IO;
 namespace StationeryCompany.ViewModel
 {
     internal class ViewModelStationery : INotifyPropertyChanged
     {
-        public string connection;
+        public string connection; 
         private DataTable _productsData;
         public DataTable ProductsData
         {
@@ -47,9 +51,13 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var types = db.ProductTypes.ToList();
+                    connections.Open();
+
+                    var query = "SELECT * FROM ProductTypes";
+
+                    var types = connections.Query<ProductType>(query).ToList();
                     foreach (var type in types)
                     {
                         ProductTypes.Add(new ProductTypeViewModel(type));
@@ -111,6 +119,13 @@ namespace StationeryCompany.ViewModel
 
         public ViewModelStationery()
         {
+            var builder = new ConfigurationBuilder();
+            string path = Directory.GetCurrentDirectory();
+            builder.SetBasePath(path);
+            builder.AddJsonFile("appsettings.json");
+            var config = builder.Build();
+            connection = config.GetConnectionString("DefaultConnection");
+
             LoadProductTypes();
             MenuItems = new ObservableCollection<MenuItem>();
             InitializeMenuItems();
@@ -131,7 +146,7 @@ namespace StationeryCompany.ViewModel
             ShowProductsByTypeCommand = new DelegateCommand(ShowProductsByType, (object parameter) => true);
             ShowProductsSoldByManagerCommand = new DelegateCommand(ShowProductsSoldByManager, (object parameter) => true);
             ShowProductsBoughtByCompanyCommand = new DelegateCommand(ShowProductsBoughtByCompanyAsync, (object parameter) => true);
-            ShowLatestSaleInfoCommand = new DelegateCommand(ShowLatestSaleInfo, (object parameter) => true);
+            ShowLatestSaleInfoCommand = new DelegateCommand(ShowLatestSaleInfoAsync, (object parameter) => true);
 
             DeleteCommand = new DelegateCommand(DeleteAsync, (object parameter) => true);
             EditCommand = new DelegateCommand(Edit, (object parameter) => true);
@@ -146,14 +161,14 @@ namespace StationeryCompany.ViewModel
 
         private void AddProduct(object obj)
         {
-            EditProducts edit = new EditProducts("Добавление продукта", "Добавить");
+            EditProducts edit = new EditProducts("Добавление продукта", "Добавить", connection);
             edit.ShowDialog();
             ShowAllProducts("ShowAllProducts");
         }
 
         private void AddProducts(object obj)
         {
-            EditOrAddProductType edit = new EditOrAddProductType("Добавление типа продукта", "Добавить");
+            EditOrAddProductType edit = new EditOrAddProductType("Добавление типа продукта", "Добавить", connection);
             edit.ShowDialog();
             ShowAllProductTypes("ShowAllProductTypes");
             InitializeMenuItems();
@@ -162,7 +177,7 @@ namespace StationeryCompany.ViewModel
 
         private void AddCompany(object obj)
         {
-            EditCompanies editManager = new EditCompanies("Добавление компании", "Добавить");
+            EditCompanies editManager = new EditCompanies("Добавление компании", "Добавить", connection);
             editManager.ShowDialog();
             ShowAllCompanies("ShowAllCompaniesWithOrderCount");
             InitializeMenuItems2();
@@ -170,7 +185,7 @@ namespace StationeryCompany.ViewModel
 
         private void AddManager(object obj)
         {
-            EditManagers editManager = new EditManagers("Добавление менеджера", "Добавить");
+            EditManagers editManager = new EditManagers("Добавление менеджера", "Добавить", connection);
             editManager.ShowDialog();
             ShowAllSalesManagers("ShowAllSalesManagers");
             InitializeMenuItems1();
@@ -187,27 +202,27 @@ namespace StationeryCompany.ViewModel
                 {
                     if (table.DataView.Table.TableName == "Products")
                     {
-                        EditProducts edit = new EditProducts("Изменение продукта", "Изменить", entityID);
+                        EditProducts edit = new EditProducts("Изменение продукта", "Изменить", entityID, connection);
                         edit.ShowDialog();
                         ShowAllProducts("ShowAllProducts");
                     }
                     if (table.DataView.Table.TableName == "ProductTypes")
                     {
-                        EditOrAddProductType edit = new EditOrAddProductType("Изменение типа продукта", "Изменить", entityID);
+                        EditOrAddProductType edit = new EditOrAddProductType("Изменение типа продукта", "Изменить", entityID, connection);
                         edit.ShowDialog();
                         ShowAllProductTypes("ShowAllProductTypes");
                         InitializeMenuItems();
                     }
                     if (table.DataView.Table.TableName == "SalesManagers")
                     {
-                        EditManagers editManager = new EditManagers("Изменение менеджера", "Изменить", entityID);
+                        EditManagers editManager = new EditManagers("Изменение менеджера", "Изменить", entityID, connection);
                         editManager.ShowDialog();
                         ShowAllSalesManagers("ShowAllSalesManagers");
                         InitializeMenuItems1();
                     }
                     if (table.DataView.Table.TableName == "CompaniesWithOrderCount")
                     {
-                        EditCompanies editManager = new EditCompanies("Изменение компании", "Изменить", entityID);
+                        EditCompanies editManager = new EditCompanies("Изменение компании", "Изменить", entityID, connection);
                         editManager.ShowDialog();
                         ShowAllCompanies("ShowAllCompaniesWithOrderCount");
                         InitializeMenuItems2();
@@ -224,47 +239,62 @@ namespace StationeryCompany.ViewModel
 
             if (result == MessageBoxResult.Yes)
             {
-                if (obj is DataRowView table)
+                if (obj is DataRowView rowView)
                 {
                     string storedProcedureName = null;
                     string parameterName = null;
                     object parameterValue = null;
 
-                    switch (table.DataView.Table.TableName)
+                    switch (rowView.Row.Table.TableName)
                     {
                         case "Products":
                             storedProcedureName = "DeleteProduct";
                             parameterName = "@ProductID";
-                            parameterValue = table["Id"];
+                            parameterValue = rowView[0];
                             break;
                         case "ProductTypes":
                             storedProcedureName = "DeleteProductTypeAndRelatedProducts";
                             parameterName = "@TypeID";
-                            parameterValue = table["Id"];
+                            parameterValue = rowView[0];
                             break;
                         case "SalesManagers":
                             storedProcedureName = "DeleteSalesManagerAndRelatedSales";
                             parameterName = "@ManagerID";
-                            parameterValue = table["Id"];
+                            parameterValue = rowView[0];
                             break;
                         case "CompaniesWithOrderCount":
                             storedProcedureName = "DeleteSalesCompaniesAndRelatedSales";
                             parameterName = "@CompaniesID";
-                            parameterValue = table["Id"];
+                            parameterValue = rowView[0];
                             break;
                     }
 
                     if (storedProcedureName != null)
                     {
-                        using (var db = new StationeryCompanyContext())
+
+                        try
                         {
-                            await db.Database.ExecuteSqlRawAsync($"EXEC {storedProcedureName} {parameterName} = {parameterValue}");
+                            using (var connections = new System.Data.SqlClient.SqlConnection(connection))
+                            {
+                                await connections.OpenAsync();
+
+                                var parameters = new DynamicParameters();
+                                parameters.Add(parameterName, parameterValue);
+
+                                await connections.ExecuteAsync(storedProcedureName, parameters, commandType: CommandType.StoredProcedure);
+                            }
+
+                            RefreshUI(rowView.Row.Table.TableName);
                         }
-                        RefreshUI(table.DataView.Table.TableName);
+                        catch (Exception ex)
+                        {
+                            System.Windows.MessageBox.Show(ex.Message);
+                        }
                     }
                 }
             }
         }
+
 
         private void RefreshUI(string tableName)
         {
@@ -292,11 +322,10 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var companies = db.CustomerCompanies
-                                      .FromSqlRaw("EXEC ShowAllCompaniesWithOrderCount")
-                                      .ToList();
+                    connections.Open();
+                    var companies = connections.Query<CustomerCompany>("EXEC ShowAllCompaniesWithOrderCount").ToList();
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("Id", typeof(int));
@@ -307,8 +336,9 @@ namespace StationeryCompany.ViewModel
 
                     foreach (var company in companies)
                     {
-                        dataTable.Rows.Add(company.CompanyId, company.CompanyName, company.PhoneNumber, company.City);
+                        dataTable.Rows.Add(company.CompanyId, company.CompanyName, company.PhoneNumber, company.City, company.Sales.Count);
                     }
+
                     ProductsData = dataTable;
                     ProductsData.TableName = "CompaniesWithOrderCount";
                 }
@@ -320,27 +350,45 @@ namespace StationeryCompany.ViewModel
             IsShowAllProductsCommandExecuted = true;
         }
 
-        private void ShowLatestSaleInfo(object obj)
+
+        private async void ShowLatestSaleInfoAsync(object obj)
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var salesInfo = db.Sales
-                                      .FromSqlRaw("EXEC ShowLatestSale")
-                                      .ToList();
+                    await connections.OpenAsync();
+                    var salesInfo = await connections.QueryAsync<Sale>(
+                        "EXEC ShowLatestSale");
 
                     DataTable dataTable = new DataTable();
-                    dataTable.Columns.Add("ProductName", typeof(string));
-                    dataTable.Columns.Add("ManagerName", typeof(string));
-                    dataTable.Columns.Add("CompanyName", typeof(string));
+                    dataTable.Columns.Add("Название продукта", typeof(string));
+                    dataTable.Columns.Add("Имя менеджера", typeof(string));
+                    dataTable.Columns.Add("Название компании", typeof(string));
+                    dataTable.Columns.Add("Количество проданного", typeof(int));
+                    dataTable.Columns.Add("Цена за единицу", typeof(decimal));
 
                     foreach (var info in salesInfo)
                     {
-                        var productName = ProductTypes.FirstOrDefault(pt => pt.TypeId == info.ProductId)?.TypeName ?? "Unknown";
+                        var productName = await connections.QueryFirstOrDefaultAsync<string>(
+                            "SELECT ProductName FROM Products WHERE ProductID = @ProductId",
+                            new { ProductId = info.ProductId });
+                        productName = productName ?? "Неизвестный продукт";
+
+                        var managerName = await connections.QueryFirstOrDefaultAsync<string>(
+                        "SELECT ManagerName FROM SalesManagers WHERE ManagerID = @ManagerId",
+                         new { ManagerId = info.ManagerId });
+                        managerName = managerName ?? "Неизвестный менеджер";
+
+                        var companyName = await connections.QueryFirstOrDefaultAsync<string>(
+                            "SELECT CompanyName FROM CustomerCompanies WHERE CompanyID = @CompanyID",
+                            new { CompanyId = info.CompanyId }); 
+                        companyName = companyName ?? "Неизвестная компания";
 
                         dataTable.Rows.Add(
                             productName,
+                            managerName,
+                            companyName,
                             info.QuantitySold,
                             info.PricePerUnit
                         );
@@ -358,26 +406,31 @@ namespace StationeryCompany.ViewModel
 
 
 
-        private async void ShowProductsBoughtByCompanyAsync(object companyName)
+
+        private async void ShowProductsBoughtByCompanyAsync(object companyNameObj)
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
-                {
-                    var companyNameParameter = new Microsoft.Data.SqlClient.SqlParameter("@CompanyName", companyName);
+                var companyName = companyNameObj as string;
+                if (companyName == null) throw new ArgumentNullException(nameof(companyNameObj), "Company name must not be null.");
 
-                    var commandText = "SELECT * FROM ProductsBoughtByCompany(@CompanyName)";
-                    var products = await db.Products.FromSqlRaw(commandText, companyNameParameter).ToListAsync();
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
+                {
+                    await connections.OpenAsync();
+                    var products = await connections.QueryAsync<Product>(
+                        "SELECT * FROM ProductsBoughtByCompany(@CompanyName)",
+                        new { CompanyName = companyName });
 
                     DataTable dataTable = new DataTable();
-                    dataTable.Columns.Add("ProductId", typeof(int));
-                    dataTable.Columns.Add("ProductName", typeof(string));
-                    dataTable.Columns.Add("QuantitySold", typeof(int));
-                    dataTable.Columns.Add("TotalSaleAmount", typeof(decimal));
+                    dataTable.Columns.Add("Id", typeof(int));
+                    dataTable.Columns.Add("Тип Продукта", typeof(string));
+                    dataTable.Columns.Add("Количество проданного", typeof(int));
+                    dataTable.Columns.Add("Общая сумма продаж", typeof(decimal));
 
                     foreach (var product in products)
                     {
-                        dataTable.Rows.Add(product.ProductId, product.ProductName, product.Quantity, product.Cost); 
+
+                        dataTable.Rows.Add(product.ProductId, product.ProductName, product.Quantity, product.Cost);
                     }
 
                     ProductsData = dataTable;
@@ -393,6 +446,7 @@ namespace StationeryCompany.ViewModel
 
 
 
+
         private async void ShowProductsSoldByManager(object obj)
         {
             try
@@ -400,40 +454,42 @@ namespace StationeryCompany.ViewModel
                 var managerName = obj as string;
                 if (managerName == null) return;
 
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var managerNameParameter = new Microsoft.Data.SqlClient.SqlParameter("@ManagerName", managerName);
-                    var sales = await db.Sales
-                                        .FromSqlRaw("EXEC GetSalesByManager @ManagerName", managerNameParameter)
-                                        .ToListAsync();
+                    await connections.OpenAsync();
+                    var parameters = new { ManagerName = managerName };
+                    var sales = await connections.QueryAsync<Sale>(
+                        "EXEC ShowProductsSoldByManager @ManagerName", parameters);
 
                     DataTable dataTable = new DataTable();
-                    dataTable.Columns.Add("ID Продажи", typeof(int));
                     dataTable.Columns.Add("Тип Продукта", typeof(string));
                     dataTable.Columns.Add("Менеджер", typeof(string));
                     dataTable.Columns.Add("Количество проданного", typeof(int));
                     dataTable.Columns.Add("Цена за единицу", typeof(decimal));
-                    dataTable.Columns.Add("Общая сумма продаж", typeof(decimal)); 
+                    dataTable.Columns.Add("Общая сумма продаж", typeof(decimal));
 
                     foreach (var sale in sales)
                     {
-                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == sale.ProductId)?.TypeName ?? "Unknown";
+                        var typeName = await connections.QueryFirstOrDefaultAsync<string>(
+                            "SELECT TypeName FROM ProductTypes WHERE TypeID = (SELECT TypeID FROM Products WHERE ProductID = @ProductId)",
+                            new { ProductId = sale.ProductId });
+
+                        typeName = typeName ?? "Unknown";
 
                         dataTable.Rows.Add(
-                            sale.SaleId,
                             typeName,
-                            managerName, 
+                            managerName,
                             sale.QuantitySold,
                             sale.PricePerUnit,
-                            sale.QuantitySold * sale.PricePerUnit 
-                            );
+                            sale.QuantitySold * sale.PricePerUnit
+                        );
                     }
-                    ProductsData = dataTable; 
+                    ProductsData = dataTable;
                 }
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show(ex.Message); 
+                System.Windows.MessageBox.Show(ex.Message);
             }
         }
 
@@ -446,13 +502,24 @@ namespace StationeryCompany.ViewModel
                 var typeName = obj as string;
                 if (typeName == null) return;
 
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var typeNameParameter = new Microsoft.Data.SqlClient.SqlParameter("@TypeName", typeName);
+                    await connections.OpenAsync();
+                    var parameters = new { TypeName = typeName };
+                    var products = await connections.QueryAsync<Product>("EXEC ShowProductsByType @TypeName", parameters);
+                    var productTypes = connections.Query<ProductType>("SELECT * FROM ProductTypes").ToDictionary(pt => pt.TypeId, pt => pt);
 
-                    var products = await db.Products
-                                           .FromSqlRaw("EXEC ShowProductsByType @TypeName", typeNameParameter)
-                                           .ToListAsync();
+                    foreach (var product in products)
+                    {
+                        if (product.TypeId.HasValue && productTypes.ContainsKey(product.TypeId.Value))
+                        {
+                            product.Type = productTypes[product.TypeId.Value];
+                        }
+                        else
+                        {
+                            product.Type = new ProductType { TypeName = "Unknown" };
+                        }
+                    }
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("ID Продукта", typeof(int));
@@ -467,12 +534,11 @@ namespace StationeryCompany.ViewModel
                             product.ProductId,
                             product.ProductName,
                             typeName,
-                            product.Quantity,
-                            product.Cost
+                            product.Quantity ?? 0,
+                            product.Cost ?? 0.0m
                         );
                     }
                     ProductsData = dataTable;
-
                 }
             }
             catch (Exception ex)
@@ -488,11 +554,23 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var products = db.Products
-                                     .FromSqlRaw("EXEC ShowProductsWithMaxCost")
-                                     .ToList();
+                    connections.Open();
+                    var products = connections.Query<Product>("EXEC ShowProductsWithMaxCost").ToList();
+                    var productTypes = connections.Query<ProductType>("SELECT * FROM ProductTypes").ToDictionary(pt => pt.TypeId, pt => pt);
+
+                    foreach (var product in products)
+                    {
+                        if (product.TypeId.HasValue && productTypes.ContainsKey(product.TypeId.Value))
+                        {
+                            product.Type = productTypes[product.TypeId.Value];
+                        }
+                        else
+                        {
+                            product.Type = new ProductType { TypeName = "Unknown" }; 
+                        }
+                    }
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("ID Продукта", typeof(int));
@@ -503,16 +581,17 @@ namespace StationeryCompany.ViewModel
 
                     foreach (var product in products)
                     {
-                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+                        var typeName = product.Type?.TypeName ?? "Unknown";
 
                         dataTable.Rows.Add(
                             product.ProductId,
                             product.ProductName,
                             typeName,
-                            product.Quantity,
-                            product.Cost
+                            product.Quantity ?? 0,
+                            product.Cost ?? 0.0m
                         );
                     }
+
                     ProductsData = dataTable;
                 }
             }
@@ -520,18 +599,32 @@ namespace StationeryCompany.ViewModel
             {
                 System.Windows.MessageBox.Show(ex.Message);
             }
-            IsShowAllProductsCommandExecuted = false;
+            IsShowAllProductsCommandExecuted = true;
         }
+
+
 
         private void ShowProductsWithMinCost(object obj)
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var products = db.Products
-                                     .FromSqlRaw("EXEC ShowProductsWithMinCost")
-                                     .ToList();
+                    connections.Open();
+                    var products = connections.Query<Product>("EXEC ShowProductsWithMinCost").ToList();
+                    var productTypes = connections.Query<ProductType>("SELECT * FROM ProductTypes").ToDictionary(pt => pt.TypeId, pt => pt);
+
+                    foreach (var product in products)
+                    {
+                        if (product.TypeId.HasValue && productTypes.ContainsKey(product.TypeId.Value))
+                        {
+                            product.Type = productTypes[product.TypeId.Value];
+                        }
+                        else
+                        {
+                            product.Type = new ProductType { TypeName = "Unknown" };
+                        }
+                    }
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("ID Продукта", typeof(int));
@@ -542,16 +635,17 @@ namespace StationeryCompany.ViewModel
 
                     foreach (var product in products)
                     {
-                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+                        var typeName = product.Type?.TypeName ?? "Unknown";
 
                         dataTable.Rows.Add(
                             product.ProductId,
                             product.ProductName,
                             typeName,
-                            product.Quantity,
-                            product.Cost
+                            product.Quantity ?? 0,
+                            product.Cost ?? 0.0m
                         );
                     }
+
                     ProductsData = dataTable;
                 }
             }
@@ -559,19 +653,30 @@ namespace StationeryCompany.ViewModel
             {
                 System.Windows.MessageBox.Show(ex.Message);
             }
-            IsShowAllProductsCommandExecuted = false;
-
+            IsShowAllProductsCommandExecuted = true;
         }
 
         private void ShowProductsWithMinQuantity(object obj)
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var products = db.Products
-                                     .FromSqlRaw("EXEC ShowProductsWithMinQuantity")
-                                     .ToList();
+                    connections.Open();
+                    var products = connections.Query<Product>("EXEC ShowProductsWithMinQuantity").ToList();
+                    var productTypes = connections.Query<ProductType>("SELECT * FROM ProductTypes").ToDictionary(pt => pt.TypeId, pt => pt);
+
+                    foreach (var product in products)
+                    {
+                        if (product.TypeId.HasValue && productTypes.ContainsKey(product.TypeId.Value))
+                        {
+                            product.Type = productTypes[product.TypeId.Value];
+                        }
+                        else
+                        {
+                            product.Type = new ProductType { TypeName = "Unknown" };
+                        }
+                    }
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("ID Продукта", typeof(int));
@@ -582,16 +687,17 @@ namespace StationeryCompany.ViewModel
 
                     foreach (var product in products)
                     {
-                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+                        var typeName = product.Type?.TypeName ?? "Unknown";
 
                         dataTable.Rows.Add(
                             product.ProductId,
                             product.ProductName,
                             typeName,
-                            product.Quantity,
-                            product.Cost
+                            product.Quantity ?? 0,
+                            product.Cost ?? 0.0m
                         );
                     }
+
                     ProductsData = dataTable;
                 }
             }
@@ -607,11 +713,23 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var products = db.Products
-                                     .FromSqlRaw("EXEC ShowProductsWithMaxQuantity")
-                                     .ToList();
+                    connections.Open();
+                    var products = connections.Query<Product>("EXEC ShowProductsWithMaxQuantity").ToList();
+                    var productTypes = connections.Query<ProductType>("SELECT * FROM ProductTypes").ToDictionary(pt => pt.TypeId, pt => pt);
+
+                    foreach (var product in products)
+                    {
+                        if (product.TypeId.HasValue && productTypes.ContainsKey(product.TypeId.Value))
+                        {
+                            product.Type = productTypes[product.TypeId.Value];
+                        }
+                        else
+                        {
+                            product.Type = new ProductType { TypeName = "Unknown" };
+                        }
+                    }
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("ID Продукта", typeof(int));
@@ -622,16 +740,17 @@ namespace StationeryCompany.ViewModel
 
                     foreach (var product in products)
                     {
-                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
+                        var typeName = product.Type?.TypeName ?? "Unknown";
 
                         dataTable.Rows.Add(
                             product.ProductId,
                             product.ProductName,
                             typeName,
-                            product.Quantity,
-                            product.Cost
+                            product.Quantity ?? 0,
+                            product.Cost ?? 0.0m
                         );
                     }
+
                     ProductsData = dataTable;
                 }
             }
@@ -649,9 +768,10 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var managers = db.SalesManagers.FromSqlRaw("EXEC ShowAllSalesManagers").ToList();
+                    connections.Open();
+                    var managers = connections.Query<SalesManager>("EXEC ShowAllSalesManagers").ToList();
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("Id", typeof(int));
@@ -662,6 +782,7 @@ namespace StationeryCompany.ViewModel
                     {
                         dataTable.Rows.Add(manager.ManagerId, manager.ManagerName, manager.PhoneNumber);
                     }
+
                     ProductsData = dataTable;
                     ProductsData.TableName = "SalesManagers";
                 }
@@ -670,17 +791,19 @@ namespace StationeryCompany.ViewModel
             {
                 System.Windows.MessageBox.Show(ex.Message);
             }
-            IsShowAllProductsCommandExecuted = true; 
+            IsShowAllProductsCommandExecuted = true;
         }
+
 
 
         private void ShowAllProductTypes(object obj)
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var productTypes = db.ProductTypes.FromSqlRaw("EXEC ShowAllProductTypes").ToList();
+                    connections.Open();
+                    var productTypes = connections.Query<ProductType>("EXEC ShowAllProductTypes").ToList();
 
                     DataTable dataTable = new DataTable();
                     dataTable.Columns.Add("Id", typeof(int));
@@ -690,8 +813,9 @@ namespace StationeryCompany.ViewModel
                     {
                         dataTable.Rows.Add(type.TypeId, type.TypeName);
                     }
+
                     ProductsData = dataTable;
-                    ProductsData.TableName = "ProductTypes";
+                    ProductsData.TableName = "ProductTypes"; 
                 }
             }
             catch (Exception ex)
@@ -707,26 +831,35 @@ namespace StationeryCompany.ViewModel
             LoadProductTypes();
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var products = db.Products.FromSqlRaw("EXEC ShowAllProducts").ToList();
-
+                    connections.Open();
+                    var products = connections.Query<Product>("ShowAllProducts", commandType: CommandType.StoredProcedure).ToList();
+                    foreach (var product in products)
+                    {
+                        if (product.TypeId.HasValue)
+                        {
+                            product.Type = connections.Query<ProductType>(
+                                "SELECT * FROM ProductTypes WHERE TypeId = @TypeId",
+                                new { TypeId = product.TypeId }
+                            ).FirstOrDefault();
+                        }
+                    }
                     DataTable dataTable = new DataTable();
                     dataTable.TableName = "Products";
-                    dataTable.Columns.Add("Id", typeof(int));
-                    dataTable.Columns.Add("Продукт", typeof(string));
+                    dataTable.Columns.Add("ID продукта", typeof(int));
+                    dataTable.Columns.Add("Название продукта", typeof(string));
                     dataTable.Columns.Add("Тип продукта", typeof(string));
                     dataTable.Columns.Add("Количество", typeof(int));
                     dataTable.Columns.Add("Стоимость", typeof(decimal));
 
                     foreach (var product in products)
                     {
-                        var typeName = ProductTypes.FirstOrDefault(pt => pt.TypeId == product.TypeId)?.TypeName ?? "Unknown";
-
+                        string typeName = product.Type?.TypeName ?? "Неизвестно";  
                         dataTable.Rows.Add(
                             product.ProductId,
                             product.ProductName,
-                            typeName,
+                            typeName, 
                             product.Quantity,
                             product.Cost
                         );
@@ -737,10 +870,12 @@ namespace StationeryCompany.ViewModel
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show(ex.Message);
+                System.Windows.MessageBox.Show("Ошибка: " + ex.Message);
             }
             IsShowAllProductsCommandExecuted = true;
         }
+
+
 
 
         public async void InitializeMenuItems()
@@ -801,15 +936,14 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var companyNames = await db.CustomerCompanies
-                                               .Select(cc => cc.CompanyName)
-                                               .Distinct()
-                                               .OrderBy(cc => cc)
-                                               .ToListAsync();
+                    await connections.OpenAsync();
 
-                    return companyNames;
+                    var companyNames = await connections.QueryAsync<string>(
+                        "SELECT DISTINCT CompanyName FROM CustomerCompanies ORDER BY CompanyName");
+
+                    return companyNames.AsList();
                 }
             }
             catch (Exception ex)
@@ -824,15 +958,14 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var managerNames = await db.SalesManagers
-                                               .Select(sm => sm.ManagerName)
-                                               .Distinct()
-                                               .OrderBy(sm => sm)
-                                               .ToListAsync();
+                    await connections.OpenAsync();
 
-                    return managerNames;
+                    var managerNames = await connections.QueryAsync<string>(
+                        "SELECT DISTINCT ManagerName FROM SalesManagers ORDER BY ManagerName");
+
+                    return managerNames.AsList();
                 }
             }
             catch (Exception ex)
@@ -846,14 +979,14 @@ namespace StationeryCompany.ViewModel
         {
             try
             {
-                using (var db = new StationeryCompanyContext())
+                using (var connections = new System.Data.SqlClient.SqlConnection(connection))
                 {
-                    var productTypes = await db.ProductTypes
-                                               .Select(pt => pt.TypeName)
-                                               .Distinct()
-                                               .ToListAsync();
+                    await connections.OpenAsync();
 
-                    return productTypes;
+                    var productTypes = await connections.QueryAsync<string>(
+                        "SELECT DISTINCT TypeName FROM ProductTypes");
+
+                    return productTypes.AsList();
                 }
             }
             catch (Exception ex)

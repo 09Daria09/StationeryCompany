@@ -69,6 +69,7 @@ CREATE TABLE SalesManagers (
 	PhoneNumber VARCHAR(20)
 );
 GO
+--SELECT ManagerName FROM SalesManagers WHERE ManagerID = 1;
 INSERT INTO SalesManagers (ManagerName, PhoneNumber) 
 VALUES 
     (N'Иван Иванов', '+380 (98) 173-45-67'),
@@ -194,23 +195,21 @@ VALUES
 CREATE PROCEDURE ShowAllProducts AS
 BEGIN
     SELECT 
-        Products.ProductID,
-        Products.ProductName,
-        Products.TypeID,
-        ProductTypes.TypeName as Type, 
-        Products.Quantity,
-        Products.Cost
+        Products.ProductID as [ProductId],
+        Products.ProductName as [ProductName],
+        Products.TypeID as [TypeId],
+        Products.Quantity as [Quantity],
+        Products.Cost as [Cost]
     FROM Products
     INNER JOIN ProductTypes ON Products.TypeID = ProductTypes.TypeID;
 END;
 GO
-
 --
 CREATE PROCEDURE ShowAllProductTypes AS
 BEGIN
     SELECT 
-        TypeID,
-        TypeName
+        TypeID as [ID типа],
+        TypeName as [Название типа]
     FROM ProductTypes;
 END;
 GO
@@ -218,9 +217,9 @@ GO
 CREATE PROCEDURE ShowAllSalesManagers AS
 BEGIN
     SELECT 
-        ManagerID,
-        ManagerName,
-        PhoneNumber
+        ManagerID as [ID менеджера],
+        ManagerName as [Имя менеджера],
+        PhoneNumber as [Телефонный номер]
     FROM SalesManagers;
 END;
 GO
@@ -228,155 +227,118 @@ GO
 CREATE PROCEDURE ShowProductsWithMaxQuantity AS
 BEGIN
     SELECT 
-        P.ProductID,
-        P.ProductName,
-        PT.TypeID, 
-        PT.TypeName as Type,
-        P.Quantity,
-        P.Cost
-    FROM Products P
-    INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
+    P.ProductID as ProductId,
+    P.ProductName as ProductName,
+    P.TypeID as TypeId,
+    P.Quantity as Quantity,
+    P.Cost as Cost
+    FROM Products p 
     WHERE P.Quantity = (SELECT MAX(Quantity) FROM Products);
 END;
 GO
 
-
+--DROP PROCEDURE ShowProductsWithMaxQuantity
 --
 CREATE PROCEDURE ShowProductsWithMinQuantity AS
 BEGIN
     SELECT 
-        P.ProductID,
-        P.ProductName,
-        PT.TypeID, 
-        PT.TypeName as Type,
-        P.Quantity,
-        P.Cost
-    FROM Products P
-	INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
+    P.ProductID as ProductId,
+    P.ProductName as ProductName,
+    P.TypeID as TypeId,
+    P.Quantity as Quantity,
+    P.Cost as Cost
+    FROM Products p 
     WHERE Quantity = (SELECT MIN(Quantity) FROM Products);
 END;
 GO
-
-
 --1
 CREATE PROCEDURE ShowProductsWithMinCost AS
 BEGIN
     SELECT 
-        P.ProductID,
-        P.ProductName,
-        PT.TypeID, 
-        PT.TypeName as Type,
-        P.Quantity,
-        P.Cost
+    P.ProductID as ProductId,
+    P.ProductName as ProductName,
+    P.TypeID as TypeId,
+    P.Quantity as Quantity,
+    P.Cost as Cost
     FROM Products p 
-	INNER JOIN ProductTypes PT ON p.TypeID = PT.TypeID
     WHERE Cost = (SELECT MIN(Cost) FROM Products);
 END;
 GO
-
 --
 CREATE PROCEDURE ShowProductsWithMaxCost AS
 BEGIN
     SELECT 
-        P.ProductID,
-        P.ProductName,
-        PT.TypeID, 
-        PT.TypeName as Type,
-        P.Quantity,
-        P.Cost
-    FROM Products P
-	INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
-    WHERE Cost = (SELECT MAX(Cost) FROM Products);
+    P.ProductID as ProductId,
+    P.ProductName as ProductName,
+    P.TypeID as TypeId,
+    P.Quantity as Quantity,
+    P.Cost as Cost
+FROM Products P
+WHERE P.Cost = (SELECT MAX(Cost) FROM Products);
 END;
 GO
+
+--EXEC ShowProductsWithMaxCost
 --
 CREATE PROCEDURE ShowProductsByType
     @TypeName NVARCHAR(255)
 AS
 BEGIN
     SELECT 
-        P.ProductID,
-        P.ProductName,
-        PT.TypeID, 
-        PT.TypeName as Type,
-        P.Quantity,
-        P.Cost
-    FROM Products P
+    P.ProductID as ProductId,
+    P.ProductName as ProductName,
+    P.TypeID as TypeId,
+    P.Quantity as Quantity,
+    P.Cost as Cost
+FROM Products P
     INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
     WHERE PT.TypeName = @TypeName;
 END;
 GO
 
-
-CREATE PROCEDURE GetSalesByManager
+CREATE PROCEDURE ShowProductsSoldByManager
     @ManagerName NVARCHAR(255)
 AS
 BEGIN
     SELECT 
-        s.SaleID,
-        s.ProductID,
-        s.ManagerID, 
-        s.QuantitySold,
-        s.PricePerUnit,
-        (s.QuantitySold * s.PricePerUnit) AS TotalSaleAmount,
-        s.CompanyID,
-        s.SaleDate
-    FROM Sales s
-    INNER JOIN SalesManagers sm ON s.ManagerID = sm.ManagerID
-    WHERE sm.ManagerName = @ManagerName;
+        P.ProductID as ProductId,
+        P.ProductName as ProductName,
+        SM.ManagerName as ManagerName,
+        S.QuantitySold as QuantitySold,
+        S.PricePerUnit as PricePerUnit
+    FROM Sales S
+    INNER JOIN Products P ON S.ProductID = P.ProductID
+    INNER JOIN SalesManagers SM ON S.ManagerID = SM.ManagerID
+    WHERE SM.ManagerName = @ManagerName;
 END;
 GO
 
---exec GetSalesByManager @ManagerName = "Ивантяй Иванов"
---Drop procedure GetSalesByManager
-
-CREATE FUNCTION ProductsBoughtByCompany (
+CREATE PROCEDURE ShowProductsBoughtByCompany
     @CompanyName NVARCHAR(255)
-)
-RETURNS @returnTable TABLE
-(
-    ProductId INT,
-    ProductName NVARCHAR(255),
-    TypeID INT, 
-    Quantity INT,
-    Cost DECIMAL(18, 2),
-    TotalSaleAmount DECIMAL(18, 2)
-)
 AS
 BEGIN
-    INSERT INTO @returnTable
     SELECT 
-        P.ProductId,
-        P.ProductName,
-        P.TypeId, 
-        SUM(S.QuantitySold) AS Quantity,
-        AVG(P.Cost) AS Cost,
-        SUM(S.QuantitySold * P.Cost) AS TotalSaleAmount
+        P.ProductID as ProductId,
+        P.ProductName as ProductName,
+        CC.CompanyName as CompanyName,
+        S.QuantitySold as QuantitySold,
+        S.PricePerUnit as PricePerUnit
     FROM Sales S
-    INNER JOIN Products P ON S.ProductId = P.ProductId
-    INNER JOIN CustomerCompanies CC ON S.CompanyId = CC.CompanyId
-    WHERE CC.CompanyName = @CompanyName
-    GROUP BY P.ProductId, P.ProductName, P.TypeId 
-    RETURN;
+    INNER JOIN Products P ON S.ProductID = P.ProductID
+    INNER JOIN CustomerCompanies CC ON S.CompanyID = CC.CompanyID
+    WHERE CC.CompanyName = @CompanyName;
 END;
 GO
 
-
---SELECT * FROM dbo.ProductsBoughtByCompany(N'ООО "Промышленные Решения"');
-
---DROP FUNCTION ProductsBoughtByCompany
 
 CREATE PROCEDURE ShowLatestSale
 AS
 BEGIN
     SELECT TOP 1
-         S.SaleID,
-        S.ProductID, 
+        S.ProductID,
         P.ProductName,
-        S.ManagerID, 
-        SM.ManagerName,
-        S.CompanyID, 
-        CC.CompanyName,
+        SM.ManagerID,
+        CC.CompanyID,
         S.QuantitySold,
         S.PricePerUnit,
         S.SaleDate
@@ -388,24 +350,20 @@ BEGIN
 END;
 GO
 
+--DROP PROCEDURE ShowLatestSale
 
 CREATE PROCEDURE ShowAverageQuantityByProductType
 AS
 BEGIN
     SELECT 
-        PT.TypeID, -- Включаем столбец TypeID
-        PT.TypeName,
-        AVG(P.Quantity) AS AverageQuantity,
-        NULL AS Cost,
-        NULL AS ProductName, 
-        NULL AS Quantity
+        PT.TypeName as [Тип продукта],
+        AVG(P.Quantity) as [Среднее количество]
     FROM Products P
     INNER JOIN ProductTypes PT ON P.TypeID = PT.TypeID
-    WHERE P.Quantity IS NOT NULL
-    GROUP BY PT.TypeID, PT.TypeName; -- Группируем также по TypeID
+    GROUP BY PT.TypeName;
 END;
 GO
-Drop procedure ShowAverageQuantityByProductType
+
 --Часть 2 
 
 CREATE PROCEDURE ShowTopManager AS
@@ -520,19 +478,17 @@ CREATE PROCEDURE ShowAllCompaniesWithOrderCount
 AS
 BEGIN
     SELECT 
-	    CC.CompanyID,
-        CC.CompanyName,
-        CC.PhoneNumber,
-		CC.City,
-        COUNT(S.SaleID)
+	    CC.CompanyID AS [ID сомпании],
+        CC.CompanyName AS [Название компании],
+        CC.PhoneNumber AS [Номер телефона],
+		CC.City AS [Город],
+        COUNT(S.SaleID) AS [Количество заказов]
     FROM CustomerCompanies CC
     LEFT JOIN Sales S ON CC.CompanyID = S.CompanyID
     GROUP BY CC.CompanyID, CC.CompanyName, CC.PhoneNumber, CC.City
     ORDER BY CC.CompanyName;
 END;
 GO
---exec ShowAllProductTypes
---Drop procedure ShowAllCompaniesWithOrderCount
 
 CREATE PROCEDURE DeleteProduct
    @ProductID INT

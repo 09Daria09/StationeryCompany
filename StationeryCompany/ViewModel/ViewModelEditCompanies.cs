@@ -11,12 +11,13 @@ using System.Windows.Input;
 using System.Windows;
 using StationeryCompany.Model;
 using Microsoft.EntityFrameworkCore;
+using Dapper;
 
 namespace StationeryCompany.ViewModel
 {
     class ViewModelEditCompanies : INotifyPropertyChanged
     {
-        public string connection;
+        public string connectionString; 
         public string _windowTitle;
         public string WindowTitle
         {
@@ -89,12 +90,12 @@ namespace StationeryCompany.ViewModel
         public string originalCompanyName = "";
         public string originalPhoneNumber = "";
         public string originalCity = "";
-        public ViewModelEditCompanies(string Title, string Content, int? ID) 
+        public ViewModelEditCompanies(string Title, string Content, int? ID, string connection) 
         {
             WindowTitle = Title;
             ContentButt = Content;
             IDproductsType = ID;
-            this.connection = connection;
+            connectionString = connection;
             LoadCompanyByIdAsync();
             ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
             {
@@ -109,29 +110,33 @@ namespace StationeryCompany.ViewModel
                 var result = MessageBox.Show("Текст был изменен. Вы уверены, что хотите сохранить изменения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (result == MessageBoxResult.Yes)
                 {
-                    using (var context = new StationeryCompanyContext()) 
+                    try
                     {
-                        var company = await context.CustomerCompanies.FindAsync(IDproductsType);
-                        if (company != null)
+                        using (var connection = new SqlConnection(connectionString))
                         {
-                            company.CompanyName = CompanyName;
-                            company.PhoneNumber = PhoneNumber;
-                            company.City = City;
+                            await connection.OpenAsync();
 
-                            try
+                            var affectedRows = await connection.ExecuteAsync(
+                                "UPDATE CustomerCompanies SET CompanyName = @CompanyName, PhoneNumber = @PhoneNumber, City = @City WHERE CompanyId = @CompanyId",
+                                new { CompanyName, PhoneNumber, City, CompanyId = IDproductsType });
+
+                            if (affectedRows > 0)
                             {
-                                await context.SaveChangesAsync();
                                 MessageBox.Show("Информация о компании успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
 
                                 originalCompanyName = CompanyName;
                                 originalPhoneNumber = PhoneNumber;
                                 originalCity = City;
                             }
-                            catch (Exception ex)
+                            else
                             {
-                                MessageBox.Show($"Ошибка при обновлении компании: {ex.Message}");
+                                MessageBox.Show("Не удалось обновить информацию о компании.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                             }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при обновлении компании: {ex.Message}");
                     }
                 }
                 else
@@ -146,22 +151,24 @@ namespace StationeryCompany.ViewModel
         }
 
 
+
         public async Task LoadCompanyByIdAsync()
         {
-            using (var context = new StationeryCompanyContext()) 
+            try
             {
-                try
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    var company = await context.CustomerCompanies
-                        .Where(c => c.CompanyId == IDproductsType) 
-                        .Select(c => new { c.CompanyName, c.PhoneNumber, c.City }) 
-                        .FirstOrDefaultAsync();
+                    await connection.OpenAsync();
+
+                    var company = await connection.QueryFirstOrDefaultAsync<CustomerCompany>(
+                        "SELECT CompanyName, PhoneNumber, City FROM CustomerCompanies WHERE CompanyId = @CompanyId",
+                        new { CompanyId = IDproductsType });
 
                     if (company != null)
                     {
-                        CompanyName = company.CompanyName ?? "Неизвестный тип";
-                        PhoneNumber = company.PhoneNumber ?? "Неизвестный тип";
-                        City = company.City ?? "Неизвестный тип";
+                        CompanyName = company.CompanyName ?? "Неизвестная компания";
+                        PhoneNumber = company.PhoneNumber ?? "Неизвестный номер";
+                        City = company.City ?? "Неизвестный город";
 
                         originalCompanyName = CompanyName;
                         originalPhoneNumber = PhoneNumber;
@@ -170,16 +177,17 @@ namespace StationeryCompany.ViewModel
                     else
                     {
                         CompanyName = "Компания не найдена.";
-                        PhoneNumber = "Неизвестный тип";
-                        City = "Неизвестный тип";
+                        PhoneNumber = "Неизвестный номер";
+                        City = "Неизвестный город";
                     }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при загрузке данных компании: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных компании: {ex.Message}");
             }
         }
+
 
         public event PropertyChangedEventHandler PropertyChanged;
 

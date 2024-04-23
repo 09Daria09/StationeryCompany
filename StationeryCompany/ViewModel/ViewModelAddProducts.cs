@@ -13,6 +13,7 @@ using StationeryCompany.Model;
 using System.Collections.ObjectModel;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Metadata;
+using Dapper;
 
 namespace StationeryCompany.ViewModel
 {
@@ -136,10 +137,11 @@ namespace StationeryCompany.ViewModel
         public int originalQuantity;
         public decimal originalCost;
         public int originalTypeID = 0;
-        public ViewModelAddProducts(string Title, string Content)
+        public ViewModelAddProducts(string Title, string Content, string connection)
         {
             WindowTitle = Title;
             ContentButt = Content;
+            connectionString = connection;
             LoadProductTypesAsync();
             ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
             {
@@ -151,31 +153,36 @@ namespace StationeryCompany.ViewModel
 
         private async Task AddAsync(object obj)
         {
-            using (var context = new StationeryCompanyContext())
+            try
             {
-                var newProduct = new Product
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    ProductName = this.ProductName,
-                    TypeId = SelectedProductType.TypeId,
-                    Quantity = this.Quantity,
-                    Cost = this.Cost
-                };
+                    await connection.OpenAsync();
 
-                try
-                {
-                    await context.Products.AddAsync(newProduct);
-                    await context.SaveChangesAsync();
+                    var parameters = new
+                    {
+                        ProductName = this.ProductName,
+                        TypeId = SelectedProductType.TypeId,
+                        Quantity = this.Quantity,
+                        Cost = this.Cost
+                    };
+
+                    var query = @"INSERT INTO Products (ProductName, TypeID, Quantity, Cost)
+                          VALUES (@ProductName, @TypeId, @Quantity, @Cost)";
+
+                    await connection.ExecuteAsync(query, parameters);
+
                     MessageBox.Show("Продукт успешно добавлен.");
 
-                    ProductName = string.Empty; 
+                    ProductName = string.Empty;
                     SelectedProductType = null;
-                    Quantity = 0; 
-                    Cost = 0; 
+                    Quantity = 0;
+                    Cost = 0;
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при добавлении продукта: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при добавлении продукта: {ex.Message}");
             }
         }
 
@@ -188,26 +195,45 @@ namespace StationeryCompany.ViewModel
 
         public async Task LoadProductTypesAsync()
         {
-
-            using (var context = new StationeryCompanyContext())
+            try
             {
-                try
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    var productTypes = await context.ProductTypes
-                        .Include(pt => pt.Products)
-                        .ToListAsync();
+                    await connection.OpenAsync();
+
+                    var query = @"SELECT pt.*, p.* FROM ProductTypes pt
+                          LEFT JOIN Products p ON pt.TypeId = p.TypeId";
+
+                    var productTypesDictionary = new Dictionary<int, ProductType>();
+
+                    await connection.QueryAsync<ProductType, Product, ProductType>(
+                        query,
+                        (type, product) =>
+                        {
+                            if (!productTypesDictionary.TryGetValue(type.TypeId, out var productType))
+                            {
+                                productType = type;
+                                productType.Products = new List<Product>();
+                                productTypesDictionary.Add(productType.TypeId, productType);
+                            }
+
+                            if (product != null)
+                                productType.Products.Add(product);
+
+                            return productType;
+                        },
+                        splitOn: "ProductId");
 
                     ProductType.Clear();
-
-                    foreach (var type in productTypes)
+                    foreach (var productType in productTypesDictionary.Values)
                     {
-                        ProductType.Add(new ProductTypeViewModel(type));
+                        ProductType.Add(new ProductTypeViewModel(productType));
                     }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка загрузки типов продуктов: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки типов продуктов: {ex.Message}");
             }
         }
 

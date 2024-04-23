@@ -1,4 +1,5 @@
-﻿using StationeryCompany.Commands;
+﻿using Dapper;
+using StationeryCompany.Commands;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -14,7 +15,7 @@ namespace StationeryCompany.ViewModel
 {
     class ViewModelEdit : INotifyPropertyChanged
     {
-        public string connection;
+        public string connectionString; 
         public string _windowTitle;
         public string WindowTitle
         {
@@ -57,12 +58,12 @@ namespace StationeryCompany.ViewModel
         public int? IDproductsType;
         public ICommand ChangeOrEditCommand {  get; set; }
         public string originalTypeName = "";
-        public ViewModelEdit(string Title, string Content, int? ID)
+        public ViewModelEdit(string Title, string Content, int? ID, string connection)
         {
             WindowTitle = Title;
             ContentButt = Content;
             IDproductsType = ID;
-            this.connection = connection;
+            connectionString = connection;
             LoadProductType();
             ChangeOrEditCommand = new DelegateCommand(Edit, (object parameter) => true);
         }
@@ -74,14 +75,25 @@ namespace StationeryCompany.ViewModel
                 var result = MessageBox.Show("Текст был изменен. Вы уверены, что хотите сохранить изменения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (result == MessageBoxResult.Yes)
                 {
-                    var parameters = new Dictionary<string, object>
-            {
-                { "@TypeID", IDproductsType },
-                { "@NewTypeName", TextProductType }
-            };
+                    try
+                    {
+                        using (var connection = new SqlConnection(connectionString))
+                        {
+                            connection.Open();
 
-                    ExecuteStoredProcedureNonQuery("UpdateProductTypeName", parameters);
-                    MessageBox.Show("Информация о типе продукта успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+                            var parameters = new DynamicParameters();
+                            parameters.Add("@TypeID", IDproductsType);
+                            parameters.Add("@NewTypeName", TextProductType);
+
+                            connection.Execute("UpdateProductTypeName", parameters, commandType: CommandType.StoredProcedure);
+
+                            MessageBox.Show("Информация о типе продукта успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при обновлении информации о типе продукта: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
                 else
                 {
@@ -92,74 +104,32 @@ namespace StationeryCompany.ViewModel
             {
                 MessageBox.Show("Изменений не обнаружено.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-
         }
+
 
 
         public void LoadProductType()
         {
-
-            using (SqlConnection connect = new SqlConnection(connection))
+            try
             {
-                SqlCommand cmd = new SqlCommand("GetProductTypeById", connect)
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    CommandType = CommandType.StoredProcedure
-                };
+                    connection.Open();
 
-                cmd.Parameters.AddWithValue("@TypeID", IDproductsType);
+                    var typeName = connection.QueryFirstOrDefault<string>(
+                        "SELECT TypeName FROM ProductTypes WHERE TypeID = @TypeID",
+                        new { TypeID = IDproductsType });
 
-                try
-                {
-                    connect.Open();
-                    using (SqlDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read()) 
-                        {
-                            TextProductType = reader.IsDBNull(reader.GetOrdinal("TypeName"))
-                                ? "Неизвестный тип"
-                                : reader.GetString(reader.GetOrdinal("TypeName"));
-                            originalTypeName = TextProductType;
-                        }
-                        else
-                        {
-                            TextProductType = "Тип продукта не найден.";
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
+                    TextProductType = string.IsNullOrEmpty(typeName) ? "Неизвестный тип" : typeName;
+                    originalTypeName = TextProductType;
                 }
             }
-        }
-        private void ExecuteStoredProcedureNonQuery(string procedureName, Dictionary<string, object> procedureParams = null)
-        {
-            using (SqlConnection connect = new SqlConnection(connection))
+            catch (Exception ex)
             {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                if (procedureParams != null)
-                {
-                    foreach (var param in procedureParams)
-                    {
-                        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                    }
-                }
-
-                try
-                {
-                    connect.Open();
-                    cmd.ExecuteNonQuery();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
+                MessageBox.Show($"Ошибка при загрузке типа продукта: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
 
         public event PropertyChangedEventHandler PropertyChanged;

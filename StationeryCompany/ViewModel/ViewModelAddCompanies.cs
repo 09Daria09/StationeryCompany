@@ -11,6 +11,7 @@ using System.Windows.Input;
 using System.Windows;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using StationeryCompany.Model;
+using Dapper;
 
 namespace StationeryCompany.ViewModel
 {
@@ -86,10 +87,11 @@ namespace StationeryCompany.ViewModel
         }
         public int? IDproductsType;
         public ICommand ChangeOrEditCommand { get; set; }
-        public ViewModelAddCompanies(string Title, string Content) 
+        public ViewModelAddCompanies(string Title, string Content, string connection) 
         {
             WindowTitle = Title;
             ContentButt = Content;
+            connectionString = connection;
             ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
             {
                 await AddCompanyAsync(parameter);
@@ -103,29 +105,33 @@ namespace StationeryCompany.ViewModel
 
         private async Task AddCompanyAsync(object param)
         {
-            using (var context = new StationeryCompanyContext()) 
+            try
             {
-                var newCompany = new CustomerCompany
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    CompanyName = CompanyName,
-                    PhoneNumber = PhoneNumber,
-                    City = City
-                };
+                    await connection.OpenAsync();
 
-                try
-                {
-                    await context.CustomerCompanies.AddAsync(newCompany); 
-                    await context.SaveChangesAsync(); 
+                    var parameters = new
+                    {
+                        CompanyName = CompanyName,
+                        PhoneNumber = PhoneNumber,
+                        City = City
+                    };
+
+                    var query = @"INSERT INTO CustomerCompanies (CompanyName, PhoneNumber, City) VALUES (@CompanyName, @PhoneNumber, @City)";
+
+                    await connection.ExecuteAsync(query, parameters);
+
                     MessageBox.Show("Компания успешно добавлена.");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при добавлении компании: {ex.Message}");
                 }
 
                 CompanyName = "";
                 PhoneNumber = "";
                 City = "";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при добавлении компании: {ex.Message}");
             }
         }
 

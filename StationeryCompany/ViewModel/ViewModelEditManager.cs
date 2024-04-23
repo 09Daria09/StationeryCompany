@@ -11,12 +11,13 @@ using System.Windows.Input;
 using System.Windows;
 using StationeryCompany.Model;
 using Microsoft.EntityFrameworkCore;
+using Dapper;
 
 namespace StationeryCompany.ViewModel
 {
     class ViewModelEditManager : INotifyPropertyChanged
     {
-        public string connection;
+        public string connectionString; 
         public string _windowTitle;
         public string WindowTitle
         {
@@ -74,12 +75,12 @@ namespace StationeryCompany.ViewModel
         public ICommand ChangeOrEditCommand { get; set; }
         public string originalTypeName = "";
         public string originalPhone = ""; 
-        public ViewModelEditManager(string Title, string Content, int? ID)
+        public ViewModelEditManager(string Title, string Content, int? ID, string connection)
         {
             WindowTitle = Title;
             ContentButt = Content;
             this.ID = ID;
-            this.connection = connection;
+            connectionString = connection;
             LoadManagerByIdAsync();
             ChangeOrEditCommand = new DelegateCommand(async (object parameter) =>
             {
@@ -94,27 +95,31 @@ namespace StationeryCompany.ViewModel
                 var result = MessageBox.Show("Текст был изменен. Вы уверены, что хотите сохранить изменения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (result == MessageBoxResult.Yes)
                 {
-                    using (var context = new StationeryCompanyContext())
+                    try
                     {
-                        var manager = await context.SalesManagers.FindAsync(ID);
-                        if (manager != null)
+                        using (var connection = new SqlConnection(connectionString))
                         {
-                            manager.ManagerName = NameManader;
-                            manager.PhoneNumber = Phone;
+                            await connection.OpenAsync();
 
-                            try
+                            var affectedRows = await connection.ExecuteAsync(
+                                "UPDATE SalesManagers SET ManagerName = @ManagerName, PhoneNumber = @PhoneNumber WHERE ManagerId = @ManagerId",
+                                new { ManagerName = NameManader, PhoneNumber = Phone, ManagerId = ID });
+
+                            if (affectedRows > 0)
                             {
-                                await context.SaveChangesAsync();
                                 MessageBox.Show("Информация о менеджере успешно обновлена.", "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
-
                                 originalTypeName = NameManader;
                                 originalPhone = Phone;
                             }
-                            catch (Exception ex)
+                            else
                             {
-                                MessageBox.Show($"Ошибка при обновлении менеджера: {ex.Message}");
+                                MessageBox.Show("Не удалось обновить информацию о менеджере.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                             }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при обновлении менеджера: {ex.Message}");
                     }
                 }
                 else
@@ -130,21 +135,23 @@ namespace StationeryCompany.ViewModel
 
 
 
+
         public async Task LoadManagerByIdAsync()
         {
-            using (var context = new StationeryCompanyContext()) 
+            try
             {
-                try
+                using (var connection = new SqlConnection(connectionString))
                 {
-                    var manager = await context.SalesManagers
-                        .Where(m => m.ManagerId == ID) 
-                        .Select(m => new { m.ManagerName, m.PhoneNumber }) 
-                        .FirstOrDefaultAsync();
+                    await connection.OpenAsync();
+
+                    var manager = await connection.QueryFirstOrDefaultAsync(
+                        "SELECT ManagerName, PhoneNumber FROM SalesManagers WHERE ManagerId = @ManagerId",
+                        new { ManagerId = ID });
 
                     if (manager != null)
                     {
-                        NameManader = manager.ManagerName ?? "Неизвестный тип";
-                        Phone = manager.PhoneNumber ?? "Неизвестный тип";
+                        NameManader = manager.ManagerName ?? "Неизвестный менеджер";
+                        Phone = manager.PhoneNumber ?? "Неизвестный номер";
                         originalTypeName = NameManader;
                         originalPhone = Phone;
                     }
@@ -154,41 +161,13 @@ namespace StationeryCompany.ViewModel
                         Phone = "???";
                     }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при загрузке данных менеджера: {ex.Message}");
-                }
             }
-        }
-
-        private void ExecuteStoredProcedureNonQuery(string procedureName, Dictionary<string, object> procedureParams = null)
-        {
-            using (SqlConnection connect = new SqlConnection(connection))
+            catch (Exception ex)
             {
-                SqlCommand cmd = new SqlCommand(procedureName, connect)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-
-                if (procedureParams != null)
-                {
-                    foreach (var param in procedureParams)
-                    {
-                        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                    }
-                }
-
-                try
-                {
-                    connect.Open();
-                    cmd.ExecuteNonQuery();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
+                MessageBox.Show($"Ошибка при загрузке данных менеджера: {ex.Message}");
             }
         }
+
 
 
         public event PropertyChangedEventHandler PropertyChanged;

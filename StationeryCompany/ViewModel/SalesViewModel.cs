@@ -95,7 +95,7 @@ namespace StationeryCompany.ViewModel
             }
         }
 
-        public DateOnly? SaleDate
+        public DateTime? SaleDate
         {
             get => _sale.SaleDate;
             set
